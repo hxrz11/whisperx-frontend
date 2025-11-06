@@ -206,7 +206,7 @@ class TranscriptionManager {
                     case 'generating_files':
                         progressPercent = 80;
                         break;
-                    case 'uploading_s3':
+                    case 'saving_files':
                         progressPercent = 90;
                         break;
                     case 'cleaning_up':
@@ -259,8 +259,8 @@ class TranscriptionManager {
             'aligning': 'Выравнивание текста',
             'diarizing': 'Диаризация спикеров',
             'generating_files': 'Генерация файлов субтитров',
-            'uploading_s3': 'Загрузка файлов на S3',
-            'cleaning_up': 'Очистка локальных файлов',
+            'saving_files': 'Сохранение файлов транскрипции',
+            'cleaning_up': 'Очистка временных файлов',
             'completed': 'Транскрипция завершена',
             'processing': 'Обработка',
             'failed': 'Ошибка',

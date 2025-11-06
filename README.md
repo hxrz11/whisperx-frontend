@@ -30,7 +30,7 @@ cd whisperx-fronted-docker-compose
 
 # 2. Настраиваем переменные окружения
 cp .env.example .env
-# Редактируем .env - добавляем настройки vLLM и S3 (при необходимости)
+# Редактируем .env - добавляем настройки vLLM
 
 # 3. Запускаем vLLM сервер (в отдельном терминале)
 docker run --gpus all -p 11434:8000 \
@@ -51,9 +51,7 @@ docker-compose up -d
 SUMMARIZATION_API_URL=http://localhost:11434/v1/chat/completions
 SUMMARIZATION_MODEL=meta-llama/Llama-3.1-8B-Instruct
 
-# Yandex S3 (опционально)
-S3_ACCESS_KEY=your-s3-key
-S3_SECRET_KEY=your-s3-secret
+# Локальное хранение используется по умолчанию, дополнительных настроек не требуется
 ```
 
 **🎯 Результат:** Полнофункциональная система транскрипции с AI суммаризацией готова к работе!
@@ -62,7 +60,7 @@ S3_SECRET_KEY=your-s3-secret
 
 ## 📋 Описание проекта
 
-whisperx-fronted-docker-compose - это полнофункциональная система для транскрипции аудио и видео файлов, построенная на основе [WhisperX](https://github.com/m-bain/whisperX) с современным веб-интерфейсом, API, Chrome расширением и real-time транскрипцией. Система поддерживает экспорт в 6 различных форматов, автоматическую загрузку в Yandex Cloud S3, суммаризацию транскриптов и автоматическую очистку локальных файлов.
+whisperx-fronted-docker-compose - это полнофункциональная система для транскрипции аудио и видео файлов, построенная на основе [WhisperX](https://github.com/m-bain/whisperX) с современным веб-интерфейсом, API, Chrome расширением и real-time транскрипцией. Система поддерживает экспорт в 6 различных форматов, локальное хранение результатов, суммаризацию транскриптов и управление историей записей.
 
 **Общая статистика проекта:** 16,437+ строк кода
 
@@ -77,9 +75,8 @@ whisperx-fronted-docker-compose - это полнофункциональная 
 
 ### 📄 Экспорт и хранение
 - **6 форматов экспорта**: JSON, SRT, VTT, TSV, DOCX, PDF
-- **Автоматическая загрузка** результатов на Yandex Cloud S3
+- **Локальное хранение** результатов без внешних облачных сервисов
 - **Организованное хранение** по категориям и форматам
-- **Автоматическая очистка** локальных файлов после загрузки
 
 ### 🔄 Real-Time транскрипция
 - **Живая транскрипция** с микрофона в реальном времени
@@ -153,7 +150,6 @@ whisperx-fronted-docker-compose/           # Корневая директори
 │   ├── 🔧 Сервисы
 │   ├── services/                         # Бизнес-логика (1,024 строки)
 │   │   ├── database_service.py           # JSON база данных (227 строк)
-│   │   ├── s3_service.py                 # Yandex Cloud S3 (149 строк)
 │   │   ├── subtitle_generator.py         # Генерация форматов (341 строка)
 │   │   └── summarization_service.py      # AI суммаризация (242 строки)
 │   ├── 
@@ -321,7 +317,7 @@ graph TB
         end
         
         subgraph Services["🔧 Services Layer"]
-            S3Service[s3_service.py<br/>Yandex Cloud S3]
+            FileStore[local storage<br/>Локальные файлы]
             DBService[database_service.py<br/>JSON база данных]
             SubtitleGen[subtitle_generator.py<br/>Генерация форматов]
         end
@@ -338,11 +334,9 @@ graph TB
     
     %% External Services
     subgraph External["☁️ External Services"]
-        YandexS3[Yandex Cloud S3<br/>Хранение файлов]
         WhisperX[🎤 WhisperX Models<br/>AI транскрипция]
     end
-    
-    S3Service --> YandexS3
+
     WhisperMgr --> WhisperX
     
     %% Data Storage
@@ -353,6 +347,7 @@ graph TB
     end
     
     DBService --> JSONDb
+    FileStore --> Uploads
     TransProcessor --> TempFiles
     TransProcessor --> Uploads
     
@@ -385,8 +380,8 @@ graph TB
     
     class User,Browser,Extension userClass
     class WebUI,StaticServer,JSModules,MainJS,APIJS,TranscriptionJS,RealtimeJS,SummarizationJS frontendClass
-    class FastAPI,APIRoutes,MainRoutes,RealtimeRoutes,Core,WhisperMgr,TransProcessor,Services,S3Service,DBService,SubtitleGen,Realtime,RTManager,RTProcessor,WSHandler backendClass
-    class YandexS3,WhisperX,Formats,JSON,SRT,VTT,TSV,DOCX,PDF externalClass
+    class FastAPI,APIRoutes,MainRoutes,RealtimeRoutes,Core,WhisperMgr,TransProcessor,Services,FileStore,DBService,SubtitleGen,Realtime,RTManager,RTProcessor,WSHandler backendClass
+    class WhisperX,Formats,JSON,SRT,VTT,TSV,DOCX,PDF externalClass
     class JSONDb,TempFiles,Uploads storageClass
     class BackendContainer,FrontendContainer,GPUSupport dockerClass
 ```
@@ -398,7 +393,7 @@ graph TB
 - **WhisperX** - AI модель транскрипции
 - **Pydantic** - валидация данных
 - **Uvicorn** - ASGI сервер
-- **boto3** - AWS/Yandex Cloud SDK
+- **Pathlib & стандартная библиотека** - работа с файлами и JSON
 - **WebSockets** - real-time коммуникация
 - **python-docx & reportlab** - генерация документов
 
@@ -416,8 +411,8 @@ graph TB
 - **Offscreen API** - аудио захват
 - **Chrome APIs** - tabs, runtime, storage
 
-### ☁️ Облачные сервисы
-- **Yandex Cloud S3** - хранение файлов
+### 💾 Локальная инфраструктура
+- **Директории данных**: `/data/uploads`, `/data/transcripts`, `/data/temp`
 - **JSON Database** - метаданные
 
 ### 🐳 DevOps
@@ -449,9 +444,6 @@ pip install -r requirements.txt
 cp web_interface/config.example.js web_interface/config.js
 
 # Настройка переменных окружения
-export S3_ACCESS_KEY="your_s3_key"
-export S3_SECRET_KEY="your_s3_secret"
-export S3_BUCKET="your_bucket"
 ```
 
 ### 🏃‍♂️ Запуск приложения
@@ -538,13 +530,13 @@ SUMMARIZATION_API_KEY=your-api-key-here
 SUMMARIZATION_MODEL=meta-llama/Llama-3.1-8B-Instruct
 ```
 
-### ☁️ Облачное хранение
-**Файлы:** `src/services/s3_service.py`
+### 💾 Локальное хранение
+**Директории:** `data/uploads`, `data/transcripts`
 
-- Автоматическая загрузка на Yandex Cloud S3
+- Сохранение результатов без внешних сервисов
 - Организация файлов по категориям
-- Генерация безопасных ссылок
-- Управление жизненным циклом файлов
+- Доступ к файлам через REST API
+- Управление жизненным циклом через JSON базу данных
 
 ### 🔌 Chrome расширение
 **Файлы:** `whisperx-fronted-docker-compose-extension/`

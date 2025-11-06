@@ -197,10 +197,10 @@ class SummarizationManager {
                 errorMessage += ': Проблема с сетевым подключением или сервер недоступен';
             } else if (error.message.includes('Не установлен ID задачи')) {
                 errorMessage += ': Не выбрана транскрипция для анализа';
-            } else if (error.message.includes('JSON файл недоступен в S3')) {
-                errorMessage += ': JSON файл транскрипции недоступен в облачном хранилище';
-            } else if (error.message.includes('Ошибка скачивания JSON из S3')) {
-                errorMessage += ': Не удалось загрузить файл транскрипции из облачного хранилища';
+            } else if (error.message.includes('JSON файл транскрипции не найден')) {
+                errorMessage += ': JSON файл транскрипции недоступен на сервере';
+            } else if (error.message.includes('Ошибка скачивания JSON')) {
+                errorMessage += ': Не удалось загрузить файл транскрипции';
             } else if (error.message.includes('API error')) {
                 errorMessage += ': Ошибка сервера суммаризации. Попробуйте позже.';
             } else {
@@ -228,35 +228,35 @@ class SummarizationManager {
             }
             
             // Получаем S3 ссылки через downloads manager
-            console.log('[Summarization] Получение S3 ссылок...');
+            console.log('[Summarization] Получение ссылок на файлы...');
             let s3Links = null;
             
             // Сначала пробуем получить из downloads manager
             if (window.downloadsManager && window.downloadsManager.currentS3Links) {
                 s3Links = window.downloadsManager.currentS3Links;
-                console.log('[Summarization] S3 ссылки получены из downloads manager');
+                console.log('[Summarization] Ссылки получены из downloads manager');
             } else {
                 // Если нет, запрашиваем через API
-                console.log('[Summarization] Запрос S3 ссылок через API...');
+                console.log('[Summarization] Запрос ссылок через API...');
                 s3Links = await this.apiManager.getS3Links(this.currentTaskId);
             }
-            
+
             if (!s3Links || !s3Links.json) {
-                throw new Error('JSON файл недоступен в S3');
+                throw new Error('JSON файл транскрипции не найден');
             }
-            
-            console.log('[Summarization] Найдена S3 ссылка на JSON:', s3Links.json);
-            
-            // Скачиваем JSON напрямую из S3
-            console.log('[Summarization] Скачивание JSON из S3...');
+
+            console.log('[Summarization] Найдена ссылка на JSON:', s3Links.json);
+
+            // Скачиваем JSON через API
+            console.log('[Summarization] Скачивание JSON из API...');
             const response = await fetch(s3Links.json);
-            
+
             if (!response.ok) {
-                throw new Error(`Ошибка скачивания JSON из S3: ${response.status} ${response.statusText}`);
+                throw new Error(`Ошибка скачивания JSON: ${response.status} ${response.statusText}`);
             }
-            
+
             const jsonData = await response.json();
-            console.log('[Summarization] JSON данные получены из S3, размер:', JSON.stringify(jsonData).length, 'символов');
+            console.log('[Summarization] JSON данные получены, размер:', JSON.stringify(jsonData).length, 'символов');
             
             // Проверяем структуру данных
             if (!jsonData.segments || !Array.isArray(jsonData.segments)) {
@@ -299,17 +299,17 @@ class SummarizationManager {
         console.log('[Summarization] Проверка доступности данных...');
         console.log('[Summarization] currentTaskId:', this.currentTaskId);
         
-        // Проверяем есть ли S3 ссылки с JSON
+        // Проверяем есть ли сохраненные ссылки с JSON
         const downloadsManager = window.downloadsManager;
         console.log('[Summarization] downloadsManager:', downloadsManager);
-        
+
         if (downloadsManager) {
             console.log('[Summarization] downloadsManager.currentS3Links:', downloadsManager.currentS3Links);
             const s3Links = downloadsManager.currentS3Links;
             if (s3Links) {
                 console.log('[Summarization] s3Links.json:', s3Links.json);
                 if (s3Links.json) {
-                    console.log('[Summarization] ✅ JSON файл найден в S3');
+                    console.log('[Summarization] ✅ JSON файл доступен');
                     return true;
                 }
             }

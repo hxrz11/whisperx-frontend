@@ -25,7 +25,6 @@ src/
 │   └── transcription_processor.py # ⚙️ Обработка транскрипций
 ├── services/
 │   ├── auth_service.py        # 🔑 OAuth сервис
-│   ├── s3_service.py          # ☁️ Yandex Cloud S3
 │   ├── database_service.py    # 📊 JSON база данных
 │   └── subtitle_generator.py  # 📄 Генерация форматов
 └── realtime/
@@ -90,10 +89,10 @@ whisperx-fronted-docker-compose-extension/
 - **Клиентская часть:** `web_interface/modules/auth.js`
 - **Middleware:** `src/middleware/auth_middleware.py`
 
-### ☁️ Облачное хранение
-- **S3 сервис:** `src/services/s3_service.py`
-- **Загрузка файлов:** автоматическая после транскрипции
-- **Ссылки:** `src/api/routes.py` → `/api/s3-links/{task_id}`
+### 💾 Локальное хранение
+- **Каталоги данных:** `data/uploads`, `data/transcripts`
+- **Скачивание:** через `src/api/routes.py` → `/api/download/*`
+- **Информация о файлах:** `/api/files/{task_id}`
 
 ### 📊 База данных
 - **JSON DB:** `src/services/database_service.py`
@@ -134,7 +133,7 @@ docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d  # 🚀 С 
 | **Real-time подключение** | `web_interface/modules/realtimeAudio.js` | `connect()` |
 | **Создание саммари** | `web_interface/modules/summarization.js` | `createSummary()` |
 | **OAuth авторизация** | `src/services/auth_service.py` | `get_oauth_url()` |
-| **Загрузка на S3** | `src/services/s3_service.py` | `upload_file()` |
+| **Информация о файлах** | `src/api/routes.py` | `get_transcription_files()` |
 | **Генерация субтитров** | `src/services/subtitle_generator.py` | `generate_*()` |
 | **История транскрипций** | `web_interface/modules/history.js` | `loadTranscriptionHistory()` |
 
@@ -162,9 +161,6 @@ docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d  # 🚀 С 
 
 ### Переменные окружения
 ```bash
-S3_ACCESS_KEY              # Yandex Cloud S3
-S3_SECRET_KEY              # Yandex Cloud S3
-S3_BUCKET                  # Имя bucket
 GOOGLE_CLIENT_ID           # OAuth клиент
 GOOGLE_CLIENT_SECRET       # OAuth секрет
 JWT_SECRET_KEY             # JWT подпись

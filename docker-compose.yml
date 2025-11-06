@@ -38,13 +38,6 @@ services:
       - HOST=0.0.0.0
       - PORT=8880
       
-      # Настройки S3 (Yandex Cloud) - используйте .env файл
-      - S3_ACCESS_KEY=${S3_ACCESS_KEY}
-      - S3_SECRET_KEY=${S3_SECRET_KEY}
-      - S3_BUCKET=${S3_BUCKET}
-      - S3_ENDPOINT=https://storage.yandexcloud.net
-      - S3_REGION=ru-central1
-      
       # Google OAuth настройки
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}

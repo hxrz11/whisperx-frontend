@@ -12,8 +12,7 @@
 - **CUDA-совместимая GPU** (рекомендуется для лучшей производительности)
 
 ### Внешние сервисы
-- **Yandex Cloud S3** аккаунт для хранения файлов
-- **Google OAuth 2.0** приложение для аутентификации
+- **Google OAuth 2.0** приложение для аутентификации (если требуется)
 - **HuggingFace** токен для диаризации спикеров
 - **Ollama** или другой LLM API для суммаризации (опционально)
 
@@ -40,17 +39,7 @@ FRONTEND_URL=https://your-domain.com
 BACKEND_URL=https://api.your-domain.com
 ```
 
-### 3. Настройка Yandex Cloud S3
-```bash
-# Получите ключи в консоли Yandex Cloud
-S3_ACCESS_KEY=your_s3_access_key
-S3_SECRET_KEY=your_s3_secret_key
-S3_BUCKET=your_s3_bucket_name
-S3_ENDPOINT=https://storage.yandexcloud.net
-S3_REGION=ru-central1
-```
-
-### 4. Настройка Google OAuth
+### 3. Настройка Google OAuth
 ```bash
 # Создайте OAuth приложение в Google Cloud Console
 GOOGLE_CLIENT_ID=your_google_client_id.apps.googleusercontent.com
@@ -58,13 +47,13 @@ GOOGLE_CLIENT_SECRET=your_google_client_secret
 REDIRECT_URI=https://api.your-domain.com/api/auth/oauth/google/callback
 ```
 
-### 5. Настройка JWT и безопасности
+### 4. Настройка JWT и безопасности
 ```bash
 # Сгенерируйте случайный ключ
 JWT_SECRET_KEY=$(openssl rand -hex 32)
 ```
 
-### 6. Настройка HuggingFace
+### 5. Настройка HuggingFace
 ```bash
 # Получите токен на https://huggingface.co/settings/tokens
 HF_TOKEN=your_huggingface_token
@@ -251,10 +240,11 @@ WHISPERX_BATCH_SIZE=8
 WHISPERX_MODEL=medium
 ```
 
-### Проблемы с сетью
+### Проблемы с доступом к файлам
 ```bash
-# Проверьте подключение к S3
-aws s3 ls --endpoint-url=https://storage.yandexcloud.net
+# Проверьте права на директории данных
+ls -la data/uploads
+ls -la data/transcripts
 
 # Проверьте API endpoints
 curl -X GET https://api.your-domain.com/api/health

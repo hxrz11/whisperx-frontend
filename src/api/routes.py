@@ -1,16 +1,15 @@
-"""
-API роуты для транскрипции
-"""
+"""API роуты для транскрипции."""
+import json
 import uuid
 from pathlib import Path
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 from datetime import datetime
 import tempfile
 import shutil
 import os
 
 from fastapi import APIRouter, File, UploadFile, HTTPException, BackgroundTasks, Query
-from fastapi.responses import JSONResponse, FileResponse, RedirectResponse
+from fastapi.responses import FileResponse
 
 from ..models.schemas import (
     TranscriptionStatus,
@@ -33,6 +32,44 @@ processor = TranscriptionProcessor()
 
 # Сервис суммаризации
 summarization_service = SummarizationService()
+
+
+def build_download_links(task_id: str, db_record: Dict[str, Any]) -> Tuple[Dict[str, str], Dict[str, str]]:
+    """Формирует ссылки для скачивания файлов и совместимые s3_links."""
+    if not task_id:
+        return {}, {}
+    subtitle_files = db_record.get('subtitle_files') or {}
+    transcript_file = db_record.get('transcript_file')
+    download_urls: Dict[str, str] = {}
+    s3_links: Dict[str, str] = {}
+
+    if transcript_file and Path(transcript_file).exists():
+        json_url = f"/api/download/transcript/{task_id}?format=json"
+        download_urls['transcript_json'] = json_url
+        s3_links['json'] = json_url
+        s3_links['full_json_s3_url'] = json_url
+
+    for fmt in ['docx', 'pdf']:
+        file_path = subtitle_files.get(fmt)
+        if file_path and Path(file_path).exists():
+            url = f"/api/download/transcript/{task_id}?format={fmt}"
+            download_urls[fmt] = url
+            s3_links[fmt] = url
+
+    for fmt in ['srt', 'vtt', 'tsv']:
+        file_path = subtitle_files.get(fmt)
+        if file_path and Path(file_path).exists():
+            url = f"/api/download/subtitle/{task_id}?format={fmt}"
+            download_urls[fmt] = url
+            s3_links[fmt] = url
+
+    audio_file = db_record.get('audio_file')
+    if audio_file and Path(audio_file).exists():
+        audio_url = f"/api/download/audio/{task_id}"
+        download_urls['audio'] = audio_url
+        s3_links['original'] = audio_url
+
+    return download_urls, s3_links
 
 
 @router.post("/upload", response_model=TranscriptionStatus)
@@ -64,9 +101,8 @@ async def upload_file(
     Процесс обработки:
     1. Загрузка и транскрипция файла
     2. Создание файлов во всех форматах
-    3. Автоматическая загрузка на Yandex Cloud S3
-    4. Удаление локальных копий файлов
-    5. Предоставление прямых ссылок на S3 для скачивания
+    3. Сохранение результатов локально
+    4. Предоставление ссылок для скачивания локальных файлов
     """
     # Проверяем формат файла
     file_extension = Path(file.filename).suffix.lower().lstrip('.')
@@ -138,40 +174,33 @@ async def get_transcription_status(
     db_record = processor.db_service.get_transcription(task_id)
     
     if db_record:
-        # Результат готов, загружаем полные данные с S3 если нужны сегменты
-        if db_record['status'] == 'completed':
-            # Для завершенных транскрипций загружаем сегменты с S3
-            segments = []
-            if 'full_json_s3_url' in db_record:
-                try:
-                    import requests
-                    response = requests.get(db_record['full_json_s3_url'])
-                    if response.status_code == 200:
-                        full_data = response.json()
-                        segments = full_data.get('segments', [])
-                except Exception as e:
-                    print(f"⚠️ Не удалось загрузить сегменты с S3: {e}")
-            
-            return TranscriptionResult(
-                id=db_record['id'],
-                filename=db_record['filename'],
-                status=db_record['status'],
-                created_at=db_record['created_at'],
-                completed_at=db_record.get('completed_at'),
-                s3_links=db_record.get('s3_links', {}),
-                segments=segments,
-                error=db_record.get('error')
-            )
-        else:
-            # Для неудачных транскрипций
-            return TranscriptionResult(
-                id=db_record['id'],
-                filename=db_record['filename'],
-                status=db_record['status'],
-                created_at=db_record['created_at'],
-                error=db_record.get('error'),
-                s3_links=db_record.get('s3_links', {})
-            )
+        transcript_file = db_record.get('transcript_file')
+        segments = []
+        if transcript_file and Path(transcript_file).exists():
+            try:
+                with open(transcript_file, 'r', encoding='utf-8') as f:
+                    full_data = json.load(f)
+                    segments = full_data.get('segments', [])
+            except Exception as e:
+                print(f"⚠️ Не удалось загрузить сегменты из {transcript_file}: {e}")
+
+        download_urls, s3_links = build_download_links(task_id, db_record)
+
+        return TranscriptionResult(
+            id=db_record['id'],
+            filename=db_record['filename'],
+            status=db_record['status'],
+            created_at=db_record['created_at'],
+            completed_at=db_record.get('completed_at'),
+            transcript_file=transcript_file,
+            audio_file=db_record.get('audio_file'),
+            subtitle_files=db_record.get('subtitle_files'),
+            s3_links=s3_links or None,
+            segments=segments if db_record['status'] == 'completed' else None,
+            error=db_record.get('error'),
+            progress=db_record.get('progress'),
+            progress_percent=db_record.get('progress_percent')
+        )
     
     elif current_status:
         # Задача в процессе
@@ -182,8 +211,7 @@ async def get_transcription_status(
             created_at=datetime.now().isoformat(),
             progress=current_status.get("progress"),
             progress_percent=current_status.get("progress_percent"),
-            error=current_status.get("error"),
-            s3_links={}
+            error=current_status.get("error")
         )
     
     else:
@@ -195,8 +223,7 @@ async def get_transcription_status(
                 filename="pending...",
                 status="pending",
                 created_at=datetime.now().isoformat(),
-                progress="Ожидание обработки",
-                s3_links={}
+                progress="Ожидание обработки"
             )
         else:
             raise HTTPException(status_code=404, detail="Задача не найдена")
@@ -209,44 +236,51 @@ async def get_all_transcriptions():
     
     results = []
     for data in transcriptions:
+        _, s3_links = build_download_links(data.get("id"), data)
+
         list_item = TranscriptionListItem(
             id=data.get("id"),
             filename=data.get("filename"),
             status=data.get("status"),
             created_at=data.get("created_at"),
             completed_at=data.get("completed_at"),
-            s3_links=data.get("s3_links", {}),
+            transcript_file=data.get("transcript_file"),
+            audio_file=data.get("audio_file"),
+            subtitle_files=data.get("subtitle_files"),
+            s3_links=s3_links or None,
             error=data.get("error"),
-            progress=data.get("progress")
+            progress=data.get("progress"),
+            progress_percent=data.get("progress_percent")
         )
         results.append(list_item)
     
     return results
 
 
+@router.get("/files/{task_id}")
 @router.get("/s3-links/{task_id}")
-async def get_s3_links(task_id: str):
-    """Получение прямых ссылок на файлы в S3 из JSON базы данных"""
+async def get_transcription_files(task_id: str):
+    """Получение информации о локально сохраненных файлах транскрипции."""
     db_record = processor.db_service.get_transcription(task_id)
-    
+
     if not db_record:
         raise HTTPException(status_code=404, detail="Транскрипция не найдена")
-    
-    s3_links = db_record.get('s3_links', {}).copy()
-    
-    # Добавляем full_json_s3_url в s3_links если он есть
-    if 'full_json_s3_url' in db_record:
-        s3_links['full_json_s3_url'] = db_record['full_json_s3_url']
-    
-    if not s3_links:
-        raise HTTPException(status_code=404, detail="S3 ссылки не найдены для этой транскрипции")
-    
+
+    subtitle_files = db_record.get('subtitle_files') or {}
+    download_urls, s3_links = build_download_links(task_id, db_record)
+
     return {
         "task_id": task_id,
         "filename": db_record.get("filename"),
-        "s3_links": s3_links,
         "created_at": db_record.get("created_at"),
-        "completed_at": db_record.get("completed_at")
+        "completed_at": db_record.get("completed_at"),
+        "files": {
+            "transcript": db_record.get('transcript_file'),
+            "audio": db_record.get('audio_file'),
+            "subtitle_files": subtitle_files
+        },
+        "download_urls": download_urls,
+        "s3_links": s3_links
     }
 
 
@@ -257,49 +291,54 @@ async def delete_transcription(task_id: str):
     # Получаем данные из базы данных
     db_record = processor.db_service.get_transcription(task_id)
     
+    deleted_files: List[str] = []
+
     if not db_record:
         # Проверяем локальные файлы (для совместимости со старыми транскрипциями)
-        deleted_files = []
-        
-        # Удаляем локальные файлы если есть
         from ..config.settings import TRANSCRIPTS_DIR
-        result_file = TRANSCRIPTS_DIR / f"{task_id}.json"
-        if result_file.exists():
-            result_file.unlink()
-            deleted_files.append(str(result_file))
-        
-        # Удаляем аудио файл
-        audio_files = list(UPLOADS_DIR.glob(f"{task_id}_*"))
-        for audio_file in audio_files:
-            audio_file.unlink()
-            deleted_files.append(str(audio_file))
-        
-        # Удаляем файлы субтитров
+
+        legacy_files = [
+            TRANSCRIPTS_DIR / f"{task_id}.json"
+        ]
+        legacy_files.extend(UPLOADS_DIR.glob(f"{task_id}_*"))
         for format_type in ['srt', 'vtt', 'tsv', 'docx', 'pdf']:
-            subtitle_files = list(TRANSCRIPTS_DIR.glob(f"{task_id}_*.{format_type}"))
-            for subtitle_file in subtitle_files:
-                subtitle_file.unlink()
-                deleted_files.append(str(subtitle_file))
-        
+            legacy_files.extend(TRANSCRIPTS_DIR.glob(f"{task_id}_*.{format_type}"))
+
+        for file_path in legacy_files:
+            if file_path.exists():
+                file_path.unlink()
+                deleted_files.append(str(file_path))
+
         if not deleted_files:
             raise HTTPException(status_code=404, detail="Транскрипция не найдена")
-        
-        # Удаляем из статусов
-        if task_id in processor.task_statuses:
-            del processor.task_statuses[task_id]
-        
-        return {"message": f"Удалены локальные файлы: {', '.join(deleted_files)}"}
-    
-    # Удаляем из базы данных
-    processor.db_service.delete_transcription(task_id)
-    
+    else:
+        for path_str in [db_record.get('transcript_file'), db_record.get('audio_file')]:
+            if path_str:
+                file_path = Path(path_str)
+                if file_path.exists():
+                    file_path.unlink()
+                    deleted_files.append(str(file_path))
+
+        for path_str in (db_record.get('subtitle_files') or {}).values():
+            if path_str:
+                file_path = Path(path_str)
+                if file_path.exists():
+                    file_path.unlink()
+                    deleted_files.append(str(file_path))
+
+        processor.db_service.delete_transcription(task_id)
+
+    # Удаляем из базы данных если запись не найдена, просто пропускаем
+    if not db_record:
+        processor.db_service.delete_transcription(task_id)
+
     # Удаляем из статусов
     if task_id in processor.task_statuses:
         del processor.task_statuses[task_id]
-    
+
     return {
-        "message": f"Транскрипция {task_id} удалена из базы данных",
-        "note": "Файлы в S3 сохранены для безопасности"
+        "message": f"Транскрипция {task_id} удалена",
+        "deleted_files": deleted_files
     }
 
 
@@ -338,20 +377,14 @@ async def create_summarization(
         if db_record['status'] != 'completed':
             raise HTTPException(status_code=400, detail="Транскрипция еще не завершена")
         
-        # Получаем JSON данные с S3
-        s3_links = db_record.get('s3_links', {})
-        full_json_url = s3_links.get('full_json_s3_url') or db_record.get('full_json_s3_url')
-        
-        if not full_json_url:
-            raise HTTPException(status_code=404, detail="JSON файл транскрипции не найден в S3")
-        
-        # Загружаем JSON с S3
-        import requests
-        response = requests.get(full_json_url)
-        if response.status_code != 200:
-            raise HTTPException(status_code=500, detail="Не удалось загрузить данные транскрипции с S3")
-        
-        transcription_data = response.json()
+        # Получаем локальный JSON файл
+        transcript_file = db_record.get('transcript_file')
+
+        if not transcript_file or not Path(transcript_file).exists():
+            raise HTTPException(status_code=404, detail="JSON файл транскрипции не найден")
+
+        with open(transcript_file, 'r', encoding='utf-8') as f:
+            transcription_data = json.load(f)
         
         # Создаем суммаризацию
         summary = await summarization_service.create_summary(transcription_data)
@@ -405,8 +438,8 @@ async def root():
             "✅ Транскрипция с WhisperX",
             "✅ Диаризация спикеров (с HuggingFace токеном)",
             "✅ 6 форматов экспорта: JSON, SRT, VTT, TSV, DOCX, PDF",
-            "✅ Автоматическая загрузка на Yandex Cloud S3",
-            "✅ Автоматическая очистка локальных файлов",
+            "✅ Локальное хранение и управление файлами",
+            "✅ Сохранение результатов в JSON базе данных",
             "✅ JSON база данных",
             "✅ Управление через веб-интерфейс"
         ],
@@ -422,7 +455,7 @@ async def root():
             "POST /upload": "Загрузка и обработка файла",
             "GET /status/{task_id}": "Статус обработки",
             "GET /transcriptions": "Список всех транскрипций",
-            "GET /s3-links/{task_id}": "Прямые ссылки на файлы в S3",
+            "GET /files/{task_id}": "Информация о локальных файлах",
             "GET /download/transcript/{task_id}": "Скачать транскрипт в различных форматах",
             "GET /download/subtitle/{task_id}": "Скачать субтитры",
             "DELETE /transcription/{task_id}": "Удаление транскрипции",
@@ -451,99 +484,54 @@ async def download_transcript(
     if db_record['status'] != 'completed':
         raise HTTPException(status_code=400, detail="Транскрипция еще не завершена")
     
-    # Получаем S3 ссылки
-    s3_links = db_record.get('s3_links', {})
-    
-    try:
-        # Сначала проверяем, есть ли готовый файл в S3
-        if format_type == 'json':
-            s3_key = 'full_json_s3_url'
-        else:
-            s3_key = format_type  # 'pdf' или 'docx'
-        
-        # Проверяем S3 ссылки и основную запись
-        s3_url = None
-        if s3_key in s3_links:
-            s3_url = s3_links[s3_key]
-        elif format_type == 'json' and 'full_json_s3_url' in db_record:
-            s3_url = db_record['full_json_s3_url']
-        
-        # Если файл уже есть в S3, делаем редирект
-        if s3_url:
-            return RedirectResponse(url=s3_url, status_code=302)
-        
-        # Если файла нет в S3, генерируем его на лету (только для PDF и DOCX)
-        if format_type in ['docx', 'pdf']:
-            # Загружаем полный JSON с S3
-            full_json_url = None
-            if 'full_json_s3_url' in s3_links:
-                full_json_url = s3_links['full_json_s3_url']
-            elif 'full_json_s3_url' in db_record:
-                full_json_url = db_record['full_json_s3_url']
-            
-            if not full_json_url:
-                raise HTTPException(status_code=404, detail="Исходные данные транскрипции не найдены в S3")
-            
-            import requests
-            response = requests.get(full_json_url)
-            if response.status_code != 200:
-                raise HTTPException(status_code=500, detail="Не удалось загрузить данные транскрипции с S3")
-            
-            transcription_data = response.json()
-            segments = transcription_data.get('segments', [])
-            
-            if not segments:
-                raise HTTPException(status_code=400, detail="Сегменты транскрипции не найдены")
-            
-            # Генерируем файл
-            from ..services.subtitle_generator import SubtitleGenerator
-            
-            # Создаем временный файл
-            temp_file = None
-            try:
-                if format_type == 'docx':
-                    temp_file = SubtitleGenerator.generate_docx(
-                        segments, task_id, db_record['filename'], temp=True
-                    )
-                elif format_type == 'pdf':
-                    temp_file = SubtitleGenerator.generate_pdf(
-                        segments, task_id, db_record['filename'], temp=True
-                    )
-                
-                if not temp_file or not Path(temp_file).exists():
-                    raise HTTPException(status_code=500, detail=f"Не удалось создать {format_type.upper()} файл")
-                
-                # Определяем MIME тип
-                media_type = {
-                    'pdf': 'application/pdf',
-                    'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-                }.get(format_type, 'application/octet-stream')
-                
-                # Возвращаем файл с автоматическим удалением
-                return FileResponse(
-                    path=temp_file,
-                    filename=f"{Path(db_record['filename']).stem}_{task_id}.{format_type}",
-                    media_type=media_type,
-                    background=BackgroundTasks()
-                )
-            
-            except Exception as gen_error:
-                # Удаляем временный файл при ошибке
-                if temp_file and Path(temp_file).exists():
-                    try:
-                        Path(temp_file).unlink()
-                    except:
-                        pass
-                raise HTTPException(status_code=500, detail=f"Ошибка генерации {format_type.upper()}: {str(gen_error)}")
-        else:
-            # Для JSON если нет в S3
-            raise HTTPException(status_code=404, detail=f"{format_type.upper()} файл не найден в S3")
-    
-    except HTTPException:
-        # Пробрасываем HTTP исключения как есть
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка обработки запроса: {str(e)}")
+    transcript_file = db_record.get('transcript_file')
+    subtitle_files = db_record.get('subtitle_files') or {}
+
+    if format_type == 'json':
+        if not transcript_file or not Path(transcript_file).exists():
+            raise HTTPException(status_code=404, detail="JSON файл не найден")
+
+        return FileResponse(
+            path=transcript_file,
+            filename=f"{Path(db_record['filename']).stem}_{task_id}.json",
+            media_type='application/json'
+        )
+
+    target_path = subtitle_files.get(format_type)
+
+    if not target_path or not Path(target_path).exists():
+        if not transcript_file or not Path(transcript_file).exists():
+            raise HTTPException(status_code=404, detail="Исходные данные транскрипции не найдены")
+
+        with open(transcript_file, 'r', encoding='utf-8') as f:
+            transcription_data = json.load(f)
+        segments = transcription_data.get('segments', [])
+
+        if not segments:
+            raise HTTPException(status_code=400, detail="Сегменты транскрипции не найдены")
+
+        generator_method = getattr(processor.subtitle_generator, f"generate_{format_type}", None)
+        if not generator_method:
+            raise HTTPException(status_code=500, detail=f"Генератор для {format_type.upper()} не доступен")
+
+        new_path = generator_method(segments, task_id, db_record['filename'], temp=False)
+        if not new_path or not Path(new_path).exists():
+            raise HTTPException(status_code=500, detail=f"Не удалось создать {format_type.upper()} файл")
+
+        subtitle_files[format_type] = new_path
+        processor.db_service.update_transcription(task_id, {"subtitle_files": subtitle_files})
+        target_path = new_path
+
+    media_type = {
+        'pdf': 'application/pdf',
+        'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    }.get(format_type, 'application/octet-stream')
+
+    return FileResponse(
+        path=target_path,
+        filename=f"{Path(db_record['filename']).stem}_{task_id}.{format_type}",
+        media_type=media_type
+    )
 
 
 @router.get("/download/subtitle/{task_id}")
@@ -566,75 +554,39 @@ async def download_subtitle(
     if db_record['status'] != 'completed':
         raise HTTPException(status_code=400, detail="Транскрипция еще не завершена")
     
-    # Получаем S3 ссылки
-    s3_links = db_record.get('s3_links', {})
-    
-    try:
-        # Загружаем данные с S3
-        full_json_url = None
-        if 'full_json_s3_url' in s3_links:
-            full_json_url = s3_links['full_json_s3_url']
-        elif 'full_json_s3_url' in db_record:
-            full_json_url = db_record['full_json_s3_url']
-        
-        if not full_json_url:
-            raise HTTPException(status_code=404, detail="Исходные данные транскрипции не найдены в S3")
-        
-        import requests
-        response = requests.get(full_json_url)
-        if response.status_code != 200:
-            raise HTTPException(status_code=500, detail="Не удалось загрузить данные транскрипции с S3")
-        
-        transcription_data = response.json()
+    subtitle_files = db_record.get('subtitle_files') or {}
+    transcript_file = db_record.get('transcript_file')
+
+    target_path = subtitle_files.get(format_type)
+
+    if not target_path or not Path(target_path).exists():
+        if not transcript_file or not Path(transcript_file).exists():
+            raise HTTPException(status_code=404, detail="Исходные данные транскрипции не найдены")
+
+        with open(transcript_file, 'r', encoding='utf-8') as f:
+            transcription_data = json.load(f)
         segments = transcription_data.get('segments', [])
-        
+
         if not segments:
             raise HTTPException(status_code=400, detail="Сегменты транскрипции не найдены")
-        
-        # Генерируем субтитры
-        from ..services.subtitle_generator import SubtitleGenerator
-        
-        # Создаем временный файл
-        temp_file = None
-        try:
-            if format_type == 'srt':
-                temp_file = SubtitleGenerator.generate_srt(
-                    segments, task_id, db_record['filename'], temp=True
-                )
-            elif format_type == 'vtt':
-                temp_file = SubtitleGenerator.generate_vtt(
-                    segments, task_id, db_record['filename'], temp=True
-                )
-            elif format_type == 'tsv':
-                temp_file = SubtitleGenerator.generate_tsv(
-                    segments, task_id, db_record['filename'], temp=True
-                )
-            
-            if not temp_file or not Path(temp_file).exists():
-                raise HTTPException(status_code=500, detail=f"Не удалось создать {format_type.upper()} файл")
-            
-            # Возвращаем файл
-            return FileResponse(
-                path=temp_file,
-                filename=f"{Path(db_record['filename']).stem}_{task_id}.{format_type}",
-                media_type='text/plain; charset=utf-8',
-                background=BackgroundTasks()
-            )
-            
-        except Exception as gen_error:
-            # Удаляем временный файл при ошибке
-            if temp_file and Path(temp_file).exists():
-                try:
-                    Path(temp_file).unlink()
-                except:
-                    pass
-            raise HTTPException(status_code=500, detail=f"Ошибка генерации {format_type.upper()}: {str(gen_error)}")
-    
-    except HTTPException:
-        # Пробрасываем HTTP исключения как есть
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка обработки запроса: {str(e)}")
+
+        generator_method = getattr(processor.subtitle_generator, f"generate_{format_type}", None)
+        if not generator_method:
+            raise HTTPException(status_code=500, detail=f"Генератор для {format_type.upper()} не доступен")
+
+        new_path = generator_method(segments, task_id, db_record['filename'], temp=False)
+        if not new_path or not Path(new_path).exists():
+            raise HTTPException(status_code=500, detail=f"Не удалось создать {format_type.upper()} файл")
+
+        subtitle_files[format_type] = new_path
+        processor.db_service.update_transcription(task_id, {"subtitle_files": subtitle_files})
+        target_path = new_path
+
+    return FileResponse(
+        path=target_path,
+        filename=f"{Path(db_record['filename']).stem}_{task_id}.{format_type}",
+        media_type='text/plain; charset=utf-8'
+    )
 
 
 @router.get("/download/audio/{task_id}")
@@ -647,15 +599,13 @@ async def download_audio(task_id: str):
     if not db_record:
         raise HTTPException(status_code=404, detail="Транскрипция не найдена")
     
-    # Получаем S3 ссылки
-    s3_links = db_record.get('s3_links', {})
-    
-    if 'audio_s3_url' in s3_links:
-        # Возвращаем прямую ссылку на S3
-        return JSONResponse({
-            "download_url": s3_links['audio_s3_url'],
-            "filename": db_record['filename'],
-            "format": "audio"
-        })
-    else:
-        raise HTTPException(status_code=404, detail="Аудио файл не найден в S3") 
+    audio_path = db_record.get('audio_file')
+
+    if not audio_path or not Path(audio_path).exists():
+        raise HTTPException(status_code=404, detail="Аудио файл не найден")
+
+    return FileResponse(
+        path=audio_path,
+        filename=Path(audio_path).name,
+        media_type='application/octet-stream'
+    )
