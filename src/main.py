@@ -18,7 +18,7 @@ def create_app() -> FastAPI:
     
     app = FastAPI(
         title="whisperx-fronted-docker-compose - AI Транскрипция",
-        description="API для транскрипции аудио и видео файлов с экспортом в 6 форматов и автоматической загрузкой на Yandex Cloud S3.",
+        description="API для транскрипции аудио и видео файлов с экспортом в 6 форматов и локальным хранением результатов.",
         version="2.1.0"
     )
     
@@ -41,8 +41,8 @@ def create_app() -> FastAPI:
         print("🚀 Запуск whisperx-fronted-docker-compose - AI Транскрипция v2.1...")
         print("🌐 CORS настроен для всех доменов")
         print("📋 Доступные форматы экспорта: JSON, SRT, VTT, TSV, DOCX, PDF")
-        print("☁️ Автоматическая загрузка файлов на Yandex Cloud S3")
-        print("🗑️ Автоматическая очистка локальных файлов после загрузки на S3")
+        print("💾 Локальное хранение файлов транскрипции")
+        print("📂 Файлы доступны через API без внешних сервисов")
         print("💾 JSON база данных для метаданных транскрипций")
         print("🎙️ Real-time транскрипция включена (WebSocket: /api/realtime/ws)")
         

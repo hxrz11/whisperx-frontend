@@ -12,7 +12,7 @@ const CONFIG = {
             DOWNLOAD_TRANSCRIPT: '/api/download/transcript',
             DOWNLOAD_SUBTITLE: '/api/download/subtitle',
             DELETE_TRANSCRIPTION: '/api/transcription',
-            S3_LINKS: '/api/s3-links',  // Новый эндпоинт для получения S3 ссылок
+            S3_LINKS: '/api/s3-links',  // Эндпоинт для получения ссылок на локальные файлы
             SUMMARIZE: '/api/summarize',  // Эндпоинт для суммаризации
             SUMMARIZATION_CONFIG: '/api/config/summarization'  // Эндпоинт для конфигурации суммаризации
         }

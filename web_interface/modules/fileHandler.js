@@ -107,7 +107,7 @@ class FileHandler {
             uploadDesc.innerHTML = `Размер: ${fileSize} МБ | Тип: ${file.type}<br>
                 Поддерживаются: MP3, M4A, WAV, MP4, AVI, MKV и другие<br>
                 Экспорт в 6 форматов: JSON, SRT, VTT, TSV, DOCX, PDF<br>
-                <strong>☁️ Автоматическая загрузка на Yandex Cloud S3</strong>`;
+                <strong>💾 Файлы сохраняются локально и доступны через API</strong>`;
         }
     }
 
@@ -157,7 +157,7 @@ class FileHandler {
         if (uploadDesc) {
             uploadDesc.innerHTML = `Поддерживаются: MP3, M4A, WAV, MP4, AVI, MKV и другие<br>
                 Экспорт в 6 форматов: JSON, SRT, VTT, TSV, DOCX, PDF<br>
-                <strong>☁️ Автоматическая загрузка на Yandex Cloud S3</strong>`;
+                <strong>💾 Файлы сохраняются локально и доступны через API</strong>`;
         }
     }
 

@@ -38,7 +38,7 @@ graph TB
     subgraph "Existing Backend"
         H[FastAPI Server :8880]
         I[WhisperX Manager]
-        J[S3 Service]
+        J[Local File Storage]
     end
     
     subgraph "New Real-Time Backend"

@@ -16,15 +16,6 @@ DATABASE_FILE = DATA_DIR / "transcriptions_db.json"
 for dir_path in [DATA_DIR, UPLOADS_DIR, TRANSCRIPTS_DIR, TEMP_DIR]:
     dir_path.mkdir(parents=True, exist_ok=True)
 
-# Конфигурация S3 (Yandex Cloud)
-S3_CONFIG = {
-    'aws_access_key_id': os.getenv('S3_ACCESS_KEY', ''),
-    'aws_secret_access_key': os.getenv('S3_SECRET_KEY', ''),
-    'bucket_name': os.getenv('S3_BUCKET', 'your-bucket-name'),
-    'endpoint_url': os.getenv('S3_ENDPOINT', 'https://storage.yandexcloud.net'),
-    'region_name': os.getenv('S3_REGION', 'ru-central1')
-}
-
 # Поддерживаемые форматы
 SUPPORTED_FORMATS = {
     # Аудио

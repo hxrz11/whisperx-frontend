@@ -18,7 +18,7 @@ const CONFIG = {
             DOWNLOAD_TRANSCRIPT: '/download/transcript',
             DOWNLOAD_SUBTITLE: '/download/subtitle',
             DELETE_TRANSCRIPTION: '/transcription',
-            S3_LINKS: '/s3-links',  // Эндпоинт для получения S3 ссылок
+            S3_LINKS: '/s3-links',  // Эндпоинт для получения ссылок на локальные файлы
             SUMMARIZE: '/summarize',  // Эндпоинт для суммаризации
             SUMMARIZATION_CONFIG: '/config/summarization'  // Эндпоинт для конфигурации суммаризации
         }

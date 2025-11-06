@@ -14,7 +14,7 @@
         <header class="header">
             <div class="header-main">
                 <h1><i class="fas fa-microphone"></i> whisperx-fronted-docker-compose - AI Транскрипция</h1>
-                <p>Персональная система транскрипции с автоматической загрузкой на S3 - Загрузите аудио или видео файл для получения транскрипции</p>
+        <p>Персональная система транскрипции с локальным хранением результатов — загрузите аудио или видео файл для получения транскрипции</p>
             </div>
         </header>
 
@@ -26,7 +26,7 @@
                     <h3>Перетащите файл сюда или нажмите для выбора</h3>
                     <p>Поддерживаются: MP3, M4A, WAV, MP4, AVI, MKV и другие<br>
                     Экспорт в 6 форматах: JSON, SRT, VTT, TSV, DOCX, PDF<br>
-                    <strong>☁️ Автоматическая загрузка на Yandex Cloud S3</strong></p>
+                    <strong>💾 Файлы сохраняются локально и доступны через API</strong></p>
                     <input type="file" id="fileInput" accept="audio/*,video/*" hidden>
                     <div class="upload-buttons">
                         <button class="btn btn-primary" id="selectFileBtn">
@@ -153,11 +153,11 @@
                 </div>
                 <div class="downloads-content" id="downloadsContent">
                     <div class="s3-links-grid" id="s3LinksGrid">
-                        <!-- S3 ссылки будут добавлены динамически -->
+                        <!-- Ссылки на файлы будут добавлены динамически -->
                     </div>
                     <p class="s3-info">
-                        <i class="fas fa-info-circle"></i> 
-                        Все файлы автоматически загружены на Yandex Cloud S3 и организованы по категориям для удобного доступа.
+                        <i class="fas fa-info-circle"></i>
+                        Все файлы сохраняются локально, доступны через API и организованы по категориям для удобного доступа.
                     </p>
                 </div>
             </div>

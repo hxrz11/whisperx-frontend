@@ -1,6 +1,5 @@
-"""
-Основной процессор транскрипции
-"""
+"""Основной процессор транскрипции."""
+import json
 import subprocess
 import asyncio
 from pathlib import Path
@@ -10,10 +9,9 @@ from concurrent.futures import ThreadPoolExecutor
 
 from ..models.schemas import TranscriptionConfig
 from ..services.subtitle_generator import SubtitleGenerator
-from ..services.s3_service import S3Service
 from ..services.database_service import DatabaseService
 from ..core.whisper_manager import WhisperManager
-from ..config.settings import UPLOADS_DIR, TEMP_DIR, PROCESSING_CONFIG
+from ..config.settings import UPLOADS_DIR, TEMP_DIR, TRANSCRIPTS_DIR, PROCESSING_CONFIG
 
 
 class TranscriptionProcessor:
@@ -22,7 +20,6 @@ class TranscriptionProcessor:
     def __init__(self):
         self.whisper_manager = WhisperManager()
         self.subtitle_generator = SubtitleGenerator()
-        self.s3_service = S3Service()
         self.db_service = DatabaseService()
         self.executor = ThreadPoolExecutor(max_workers=PROCESSING_CONFIG['max_workers'])
         self.task_statuses = {}  # Статусы задач в памяти
@@ -56,37 +53,6 @@ class TranscriptionProcessor:
         except Exception as e:
             print(f"❌ Ошибка извлечения аудио: {e}")
             return False
-    
-    def cleanup_local_files(self, task_id: str, filename: str, s3_links: Dict[str, str]):
-        """Удаление локальных файлов после загрузки на S3"""
-        files_to_delete = []
-        
-        try:
-            # Удаляем оригинальный файл, если он загружен на S3
-            if 'original' in s3_links:
-                original_files = list(UPLOADS_DIR.glob(f"{task_id}_*"))
-                files_to_delete.extend(original_files)
-            
-            # Удаляем локальные файлы субтитров, если они загружены на S3
-            for format_type in ['srt', 'vtt', 'tsv', 'docx', 'pdf']:
-                if format_type in s3_links:
-                    from ..config.settings import TRANSCRIPTS_DIR
-                    local_files = list(TRANSCRIPTS_DIR.glob(f"{task_id}_*.{format_type}"))
-                    files_to_delete.extend(local_files)
-            
-            # Удаляем файлы
-            for file_path in files_to_delete:
-                try:
-                    if file_path.exists():
-                        file_path.unlink()
-                        print(f"🗑️ Удален локальный файл: {file_path.name}")
-                except Exception as e:
-                    print(f"⚠️ Не удалось удалить файл {file_path}: {e}")
-            
-            print(f"✅ Очистка локальных файлов завершена для {task_id}")
-            
-        except Exception as e:
-            print(f"❌ Ошибка при очистке локальных файлов: {e}")
     
     def process_transcription_sync(
         self,
@@ -141,19 +107,19 @@ class TranscriptionProcessor:
             # Этап 8: Генерация файлов (75-85%)
             self.update_task_status(task_id, "generating_files", "Генерация файлов субтитров...", progress_percent=80)
             
-            # Этап 9: Загрузка на S3 (85-95%)
-            self.update_task_status(task_id, "uploading_s3", "Загрузка файлов на S3...", progress_percent=90)
+            # Этап 9: Сохранение файлов (85-95%)
+            self.update_task_status(task_id, "saving_files", "Сохранение файлов транскрипции...", progress_percent=90)
             self.save_transcription_result(task_id, result, original_filename)
-            
+
             # Этап 10: Очистка (95-100%)
-            self.update_task_status(task_id, "cleaning_up", "Очистка локальных файлов...", progress_percent=97)
-            
+            self.update_task_status(task_id, "cleaning_up", "Очистка временных файлов...", progress_percent=97)
+
             # Очищаем временные файлы
             if processing_file != file_path and processing_file.exists():
                 processing_file.unlink()
-            
+
             # Завершение (100%)
-            self.update_task_status(task_id, "completed", "Транскрипция завершена, файлы загружены на S3", progress_percent=100)
+            self.update_task_status(task_id, "completed", "Транскрипция завершена, файлы сохранены локально", progress_percent=100)
             print(f"✅ Транскрипция завершена для {task_id}")
             
         except Exception as e:
@@ -181,45 +147,26 @@ class TranscriptionProcessor:
         )
 
     def save_transcription_result(self, task_id: str, result: Dict[str, Any], filename: str):
-        """Сохранение результата транскрипции с загрузкой на S3"""
-        
+        """Сохранение результата транскрипции и локальных файлов."""
+
         # Генерируем файлы субтитров
         self.update_task_status(task_id, "generating_files", "Генерация файлов субтитров...", progress_percent=80)
         segments = result.get("segments", [])
         subtitle_files = self.subtitle_generator.generate_all_formats(
-            segments, task_id, filename, temp=True
+            segments, task_id, filename, temp=False
         )
-        
-        # Загружаем файлы на S3
-        self.update_task_status(task_id, "uploading_s3", "Загрузка файлов транскрипции на S3...", progress_percent=85)
-        print(f"📤 Загружаем файлы транскрипции на S3 для {task_id}...")
-        s3_links = self.s3_service.upload_transcript_files(task_id, filename, subtitle_files)
-        
-        # Загружаем оригинальный файл на S3
-        self.update_task_status(task_id, "uploading_s3", "Загрузка оригинального файла на S3...", progress_percent=88)
+
+        # Фиксируем пути к созданным файлам
+        local_files = {fmt: str(Path(path)) for fmt, path in subtitle_files.items()}
+
+        # Сохраняем оригинальный файл
         original_files = list(UPLOADS_DIR.glob(f"{task_id}_*"))
-        if original_files:
-            original_file = original_files[0]
-            original_file_s3_url = self.s3_service.upload_original_file(task_id, filename, original_file)
-            if original_file_s3_url:
-                s3_links['original'] = original_file_s3_url
-        
+        original_file_path = str(original_files[0]) if original_files else None
+
         # Создаем данные для базы данных (без сегментов для экономии места)
-        self.update_task_status(task_id, "uploading_s3", "Сохранение в базу данных...", progress_percent=92)
-        transcription_data = self.db_service.create_completed_record(
-            task_id=task_id,
-            filename=filename,
-            s3_links=s3_links,
-            language=result.get("language"),
-            segments_count=len(segments),
-            duration=result.get("duration", 0)
-        )
-        
-        # Сохраняем в JSON базу данных
-        self.db_service.add_transcription(transcription_data)
-        
-        # Сохраняем полные данные с сегментами на S3 как JSON файл
-        self.update_task_status(task_id, "uploading_s3", "Загрузка полного JSON на S3...", progress_percent=95)
+        self.update_task_status(task_id, "saving_files", "Сохранение данных в базу...", progress_percent=92)
+
+        # Сохраняем полный JSON локально
         full_transcription_data = {
             "id": task_id,
             "filename": filename,
@@ -227,19 +174,28 @@ class TranscriptionProcessor:
             "created_at": result.get("created_at"),
             "completed_at": datetime.now().isoformat(),
             "segments": segments,
-            "language": result.get("language"),
-            "s3_links": s3_links
+            "language": result.get("language")
         }
-        
-        # Загружаем полный JSON на S3
-        full_json_s3_url = self.s3_service.upload_json_data(task_id, filename, full_transcription_data)
-        if full_json_s3_url:
-            self.db_service.update_transcription(task_id, {"full_json_s3_url": full_json_s3_url})
-        
-        # Удаляем локальные файлы после успешной загрузки на S3
-        self.update_task_status(task_id, "cleaning_up", "Очистка локальных файлов...", progress_percent=97)
-        self.cleanup_local_files(task_id, filename, s3_links)
-        
+
+        transcript_filename = f"{task_id}_{Path(filename).stem}_full.json"
+        transcript_path = TRANSCRIPTS_DIR / transcript_filename
+        with open(transcript_path, "w", encoding="utf-8") as json_file:
+            json.dump(full_transcription_data, json_file, ensure_ascii=False, indent=2)
+
+        transcription_data = self.db_service.create_completed_record(
+            task_id=task_id,
+            filename=filename,
+            transcript_file=str(transcript_path),
+            audio_file=original_file_path,
+            subtitle_files=local_files,
+            language=result.get("language"),
+            segments_count=len(segments),
+            duration=result.get("duration", 0)
+        )
+
+        # Сохраняем в JSON базу данных
+        self.db_service.add_transcription(transcription_data)
+
         return transcription_data
     
     def save_error_result(self, task_id: str, error_msg: str, filename: str):

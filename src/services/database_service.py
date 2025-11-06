@@ -98,7 +98,10 @@ class DatabaseService:
             "filename": filename,
             "status": status,
             "created_at": datetime.now().isoformat(),
-            "s3_links": {},
+            "transcript_file": None,
+            "audio_file": None,
+            "subtitle_files": {},
+            "s3_links": kwargs.pop('s3_links', {}),
             **kwargs
         }
         return record
@@ -112,14 +115,17 @@ class DatabaseService:
             error=error_msg
         )
 
-    def create_completed_record(self, task_id: str, filename: str, s3_links: Dict, **kwargs) -> Dict:
+    def create_completed_record(self, task_id: str, filename: str, transcript_file: str = None,
+                                audio_file: str = None, subtitle_files: Dict = None, **kwargs) -> Dict:
         """Создание записи о завершенной транскрипции"""
         return self.create_transcription_record(
             task_id=task_id,
             filename=filename,
             status="completed",
             completed_at=datetime.now().isoformat(),
-            s3_links=s3_links,
+            transcript_file=transcript_file,
+            audio_file=audio_file,
+            subtitle_files=subtitle_files or {},
             **kwargs
         )
     
