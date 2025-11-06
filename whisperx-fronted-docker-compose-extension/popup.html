@@ -49,11 +49,6 @@
             transform: none;
         }
         
-        #loginBtn {
-            background-color: #4285f4;
-            color: white;
-        }
-        
         #requestPermissionBtn {
             background-color: #ff6b6b;
             color: white;
@@ -392,15 +387,8 @@
 </head>
 <body>
     <div class="container">
-        <!-- Состояние 1: Нужна авторизация -->
-        <div id="loginSection">
-            <h3>🎤 whisperx-fronted-docker-compose</h3>
-            <p>Войдите для записи встреч</p>
-            <button id="loginBtn">🔐 Войти через Google</button>
-        </div>
-        
-        <!-- Состояние 2: Готов к записи -->
-        <div id="recordingSection" style="display:none">
+        <!-- Интерфейс записи -->
+        <div id="recordingSection">
             <h3>🎤 whisperx-fronted-docker-compose</h3>
             <div id="userInfo">Привет, <span id="userName">Пользователь</span>!</div>
             

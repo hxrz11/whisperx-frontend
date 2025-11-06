@@ -89,12 +89,11 @@ class TranscriptionProcessor:
             print(f"❌ Ошибка при очистке локальных файлов: {e}")
     
     def process_transcription_sync(
-        self, 
-        task_id: str, 
-        file_path: Path, 
+        self,
+        task_id: str,
+        file_path: Path,
         config: TranscriptionConfig,
-        original_filename: str,
-        user_id: str = None
+        original_filename: str
     ):
         """Синхронная обработка транскрипции"""
         try:
@@ -111,7 +110,7 @@ class TranscriptionProcessor:
                 audio_path = TEMP_DIR / f"{task_id}_audio.wav"
                 if not self.extract_audio_from_video(file_path, audio_path):
                     error_msg = "Ошибка извлечения аудио из видео"
-                    self.save_error_result(task_id, error_msg, original_filename, user_id)
+                    self.save_error_result(task_id, error_msg, original_filename)
                     self.update_task_status(task_id, "failed", error=error_msg, progress_percent=0)
                     return
                 processing_file = audio_path
@@ -144,7 +143,7 @@ class TranscriptionProcessor:
             
             # Этап 9: Загрузка на S3 (85-95%)
             self.update_task_status(task_id, "uploading_s3", "Загрузка файлов на S3...", progress_percent=90)
-            self.save_transcription_result(task_id, result, original_filename, user_id)
+            self.save_transcription_result(task_id, result, original_filename)
             
             # Этап 10: Очистка (95-100%)
             self.update_task_status(task_id, "cleaning_up", "Очистка локальных файлов...", progress_percent=97)
@@ -160,16 +159,15 @@ class TranscriptionProcessor:
         except Exception as e:
             error_msg = f"Ошибка обработки: {str(e)}"
             print(f"❌ {error_msg}")
-            self.save_error_result(task_id, error_msg, original_filename, user_id)
+            self.save_error_result(task_id, error_msg, original_filename)
             self.update_task_status(task_id, "failed", error=error_msg, progress_percent=0)
     
     async def process_transcription(
-        self, 
-        task_id: str, 
-        file_path: Path, 
+        self,
+        task_id: str,
+        file_path: Path,
         config: TranscriptionConfig,
-        original_filename: str,
-        user_id: str = None
+        original_filename: str
     ):
         """Асинхронная обработка транскрипции"""
         loop = asyncio.get_event_loop()
@@ -177,13 +175,12 @@ class TranscriptionProcessor:
             self.executor, 
             self.process_transcription_sync, 
             task_id, 
-            file_path, 
-            config, 
-            original_filename,
-            user_id
+            file_path,
+            config,
+            original_filename
         )
-    
-    def save_transcription_result(self, task_id: str, result: Dict[str, Any], filename: str, user_id: str = None):
+
+    def save_transcription_result(self, task_id: str, result: Dict[str, Any], filename: str):
         """Сохранение результата транскрипции с загрузкой на S3"""
         
         # Генерируем файлы субтитров
@@ -215,8 +212,7 @@ class TranscriptionProcessor:
             s3_links=s3_links,
             language=result.get("language"),
             segments_count=len(segments),
-            duration=result.get("duration", 0),
-            user_id=user_id
+            duration=result.get("duration", 0)
         )
         
         # Сохраняем в JSON базу данных
@@ -246,7 +242,7 @@ class TranscriptionProcessor:
         
         return transcription_data
     
-    def save_error_result(self, task_id: str, error_msg: str, filename: str, user_id: str = None):
+    def save_error_result(self, task_id: str, error_msg: str, filename: str):
         """Сохранение результата с ошибкой в JSON базу данных"""
-        error_data = self.db_service.create_error_record(task_id, filename, error_msg, user_id=user_id)
+        error_data = self.db_service.create_error_record(task_id, filename, error_msg)
         self.db_service.add_transcription(error_data) 

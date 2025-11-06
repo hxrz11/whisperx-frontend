@@ -1,5 +1,6 @@
 // Состояние записи
-let currentUser = null;
+const DEFAULT_USER = { name: 'Гость', email: 'guest@local' };
+let currentUser = DEFAULT_USER;
 let isRecording = false;
 let recordingStartTime = null;
 
@@ -34,17 +35,18 @@ async function restoreState() {
     
     const data = await chrome.storage.local.get(['isRecording', 'recordingStartTime', 'currentUser']);
     console.log('Background: Retrieved data from storage:', data);
-    
+
     if (data.isRecording) {
       isRecording = data.isRecording;
       recordingStartTime = data.recordingStartTime;
-      currentUser = data.currentUser;
-      
+      currentUser = data.currentUser || DEFAULT_USER;
+
       console.log('Background: State restored');
       console.log('Background: isRecording =', isRecording);
       console.log('Background: recordingStartTime =', recordingStartTime);
       console.log('Background: currentUser =', currentUser?.email);
     } else {
+      currentUser = DEFAULT_USER;
       console.log('Background: No active recording found in storage');
     }
   } catch (error) {
@@ -88,7 +90,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   
   // Сообщения от popup
   if (request.action === 'startRecording') {
-    currentUser = request.user;
+    currentUser = request.user || DEFAULT_USER;
     console.log('Starting recording for user:', currentUser?.email);
     console.log('Recording settings:', request.settings);
     startRecording(request.settings)
@@ -273,63 +275,23 @@ async function requestMicrophonePermission() {
   }
 }
 
-// Проверка авторизации через API
+// Авторизация отключена — возвращаем гостевого пользователя
 async function checkAuthStatus() {
-  try {
-    console.log('Background: Checking auth status...');
-    
-    const response = await fetch('http://localhost:8880/api/auth/status', {
-      credentials: 'include'
-    });
-    
-    console.log('Background: Auth API response status:', response.status);
-    
-    if (response.ok) {
-      const data = await response.json();
-      console.log('Background: Auth status data:', data);
-      
-      if (data.authenticated && data.user) {
-        currentUser = data.user;
-        console.log('Background: User authenticated:', currentUser);
-        return {
-          success: true,
-          authenticated: true,
-          user: data.user
-        };
-      } else {
-        console.log('Background: User not authenticated');
-        currentUser = null;
-        return {
-          success: true,
-          authenticated: false
-        };
-      }
-    } else {
-      console.log('Background: Auth check failed with status:', response.status);
-      currentUser = null;
-      return {
-        success: true,
-        authenticated: false
-      };
-    }
-  } catch (error) {
-    console.error('Background: Auth check error:', error);
-    currentUser = null;
-    return {
-      success: false,
-      error: error.message,
-      authenticated: false
-    };
+  console.log('Background: Authorization disabled, using guest profile');
+  if (!currentUser) {
+    currentUser = DEFAULT_USER;
   }
+
+  return {
+    success: true,
+    authenticated: true,
+    user: currentUser
+  };
 }
 
 // Начало записи
 async function startRecording(settings = {}) {
   try {
-    if (!currentUser) {
-      throw new Error('Нет данных пользователя');
-    }
-    
     console.log('Attempting to get tab stream ID...');
     
     // Проверяем доступность API
@@ -446,9 +408,9 @@ async function stopRecording() {
 
 // Показ системного уведомления об успешной загрузке
 function showSuccessNotification(uploadResult = null) {
-  if (!currentUser) return;
-  
-  let message = `Транскрипция для ${currentUser.name || currentUser.email} в процессе. Нажмите для перехода в веб-интерфейс.`;
+  const user = currentUser || DEFAULT_USER;
+
+  let message = `Транскрипция для ${user.name || user.email} в процессе. Нажмите для перехода в веб-интерфейс.`;
   
   // Если есть результат загрузки с task_id, добавляем информацию
   if (uploadResult && uploadResult.task_id) {

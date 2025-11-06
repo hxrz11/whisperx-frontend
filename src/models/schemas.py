@@ -2,57 +2,10 @@
 Модели данных для API
 """
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, EmailStr  # Включено обратно
+from pydantic import BaseModel
 from datetime import datetime
 
 
-# Модели аутентификации
-class GoogleUser(BaseModel):
-    """Модель пользователя Google"""
-    email: EmailStr  # Включено обратно
-    name: str
-    picture: Optional[str] = None
-    google_id: str
-    locale: Optional[str] = None
-
-
-class User(BaseModel):
-    """Модель пользователя в системе"""
-    id: str
-    email: EmailStr  # Включено обратно
-    name: str
-    picture: Optional[str] = None
-    google_id: str
-    created_at: datetime
-    last_login: datetime
-    is_active: bool = True
-
-
-class UserSession(BaseModel):
-    """Модель пользовательской сессии"""
-    user_id: str
-    session_token: str
-    expires_at: datetime
-    created_at: datetime
-    user_agent: Optional[str] = None
-    ip_address: Optional[str] = None
-
-
-class AuthResponse(BaseModel):
-    """Ответ при аутентификации"""
-    access_token: str
-    token_type: str = "bearer"
-    expires_in: int
-    user_info: User
-
-
-class TokenData(BaseModel):
-    """Данные из JWT токена"""
-    user_id: Optional[str] = None
-    email: Optional[str] = None
-
-
-# Существующие модели транскрипции
 class TranscriptionConfig(BaseModel):
     """Конфигурация для транскрипции"""
     model: str = "large-v3"
@@ -73,7 +26,6 @@ class TranscriptionStatus(BaseModel):
     error: Optional[str] = None
     progress: Optional[str] = None
     progress_percent: Optional[int] = None
-    user_id: Optional[str] = None  # Добавляем связь с пользователем
 
 
 class TranscriptionResult(BaseModel):
@@ -91,7 +43,6 @@ class TranscriptionResult(BaseModel):
     error: Optional[str] = None
     progress: Optional[str] = None
     progress_percent: Optional[int] = None
-    user_id: Optional[str] = None  # Добавляем связь с пользователем
 
 
 class TranscriptionListItem(BaseModel):
@@ -108,4 +59,3 @@ class TranscriptionListItem(BaseModel):
     error: Optional[str] = None
     progress: Optional[str] = None
     progress_percent: Optional[int] = None
-    user_id: Optional[str] = None  # Добавляем связь с пользователем 

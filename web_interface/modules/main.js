@@ -2,7 +2,6 @@
 class AppManager {
     constructor() {
         // Инициализация менеджеров
-        this.authManager = new AuthManager();
         this.uiManager = new UIManager();
         this.apiManager = new ApiManager();
         this.fileHandler = new FileHandler();
@@ -18,7 +17,6 @@ class AppManager {
         this.realtimeUIManager = new RealtimeUI();
 
         // Глобальные ссылки для обратной совместимости
-        window.authManager = this.authManager;
         window.uiManager = this.uiManager;
         window.apiManager = this.apiManager;
         window.fileHandler = this.fileHandler;
@@ -32,22 +30,12 @@ class AppManager {
         window.realtimeUIManager = this.realtimeUIManager;
 
         // Глобальные функции для обратной совместимости
-        window.logout = () => this.authManager.logout();
         window.closeModal = () => this.uiManager.closeModal();
     }
 
     // Инициализация приложения
     async initialize() {
         try {
-            // Проверка авторизации через API
-            const isAuthenticated = await this.authManager.init();
-            if (!isAuthenticated) {
-                return; // Перенаправлен на страницу входа
-            }
-
-            // Отображение информации о пользователе
-            await this.displayUserInfo();
-
             // Инициализация всех модулей
             this.initializeModules();
             
@@ -91,12 +79,6 @@ class AppManager {
             this.initializeDiarizeButton();
         }
 
-        // Настройка кнопки выхода
-        const logoutButton = document.getElementById('logoutBtn');
-        if (logoutButton) {
-            logoutButton.addEventListener('click', () => this.authManager.logout());
-        }
-        
         // Настройка кнопок Real-Time
         const realtimeButtonMain = document.getElementById('realtime-btn-main');
         const realtimeButtonSettings = document.getElementById('realtime-btn');
@@ -142,47 +124,6 @@ class AppManager {
         this.mediaPlayerManager.setOnTimeUpdateCallback((currentTime) => {
             this.transcriptManager.updateTranscriptHighlight(currentTime);
         });
-    }
-
-    // Отображение информации о пользователе
-    async displayUserInfo() {
-        try {
-            const user = await this.authManager.getCurrentUser();
-            if (user) {
-                const userInfoElement = document.getElementById('userInfo');
-                const userNameElement = document.getElementById('userName');
-                const userEmailElement = document.getElementById('userEmail');
-                const userAvatarElement = document.getElementById('userAvatar');
-                const defaultAvatarElement = document.getElementById('defaultAvatar');
-
-                // Отображаем информацию о пользователе
-                if (userNameElement) {
-                    userNameElement.textContent = user.name || 'Пользователь';
-                }
-                if (userEmailElement) {
-                    userEmailElement.textContent = user.email || '';
-                }
-
-                // Отображаем аватар если есть
-                if (user.picture && userAvatarElement && defaultAvatarElement) {
-                    userAvatarElement.src = user.picture;
-                    userAvatarElement.style.display = 'block';
-                    defaultAvatarElement.style.display = 'none';
-                } else if (defaultAvatarElement) {
-                    defaultAvatarElement.style.display = 'block';
-                    if (userAvatarElement) {
-                        userAvatarElement.style.display = 'none';
-                    }
-                }
-
-                // Показываем блок с информацией о пользователе
-                if (userInfoElement) {
-                    userInfoElement.style.display = 'flex';
-                }
-            }
-        } catch (error) {
-            console.error('Ошибка отображения информации о пользователе:', error);
-        }
     }
 
     // Загрузка начальных данных
@@ -612,7 +553,7 @@ class AppManager {
             totalTranscriptions: this.historyManager.transcriptions.length,
             currentTranscript: this.transcriptManager.getCurrentTranscript(),
             transcriptStats: this.transcriptManager.getTranscriptStats(),
-            isSessionValid: this.authManager.isSessionValid()
+            isSessionValid: true
         };
     }
 

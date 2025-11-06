@@ -1,8 +1,5 @@
 // Элементы UI
-const loginSection = document.getElementById('loginSection');
 const recordingSection = document.getElementById('recordingSection');
-
-const loginBtn = document.getElementById('loginBtn');
 const requestPermissionBtn = document.getElementById('requestPermissionBtn');
 const startBtn = document.getElementById('startBtn');
 const stopBtn = document.getElementById('stopBtn');
@@ -30,7 +27,8 @@ const tabLevelText = document.getElementById('tabLevelText');
 // Состояние
 let isRecording = false;
 let startTime = null;
-let currentUser = null;
+const DEFAULT_USER = { name: 'Гость', email: 'guest@local' };
+let currentUser = DEFAULT_USER;
 let micPermissionGranted = false;
 let timerInterval = null;
 
@@ -41,29 +39,29 @@ const API_BASE = 'http://localhost:8880/api';
 document.addEventListener('DOMContentLoaded', async () => {
   setupEventListeners();
   await checkAuthStatus();
-  // Проверяем статус записи только после проверки авторизации
+  // Проверяем статус записи только после инициализации
   await checkRecordingStatus();
 });
 
-// Проверка авторизации через сессию браузера
+// Инициализация без авторизации
 async function checkAuthStatus() {
   try {
-    status.textContent = 'Проверяем авторизацию...';
-    
+    status.textContent = 'Готов к записи встреч';
+
     const response = await chrome.runtime.sendMessage({
       action: 'checkAuthStatus'
     });
-    
+
     console.log('Auth status response:', response);
-    
-    if (response.success && response.authenticated && response.user) {
+
+    if (response && response.user) {
       showRecordingInterface(response.user);
     } else {
-      showLoginInterface();
+      showRecordingInterface(DEFAULT_USER);
     }
   } catch (error) {
     console.error('Auth check error:', error);
-    showLoginInterface();
+    showRecordingInterface(DEFAULT_USER);
   }
 }
 
@@ -78,11 +76,11 @@ async function checkRecordingStatus() {
     
     console.log('Popup: Recording status response:', response);
     
-    if (response && response.isRecording && response.user) {
+    if (response && response.isRecording) {
       console.log('Popup: Found active recording, restoring state...');
-      
+
       // Восстанавливаем состояние записи
-      currentUser = response.user;
+      currentUser = response.user || DEFAULT_USER;
       startTime = response.startTime;
       isRecording = true;
       micPermissionGranted = true; // Если запись идет, разрешение есть
@@ -163,23 +161,13 @@ function updatePermissionStatus(state) {
   }
 }
 
-// Показать интерфейс входа
-function showLoginInterface() {
-  loginSection.style.display = 'block';
-  recordingSection.style.display = 'none';
-  
-  status.textContent = 'Необходима авторизация';
-}
-
 // Показать интерфейс записи
 function showRecordingInterface(user) {
-  currentUser = user;
-  
-  loginSection.style.display = 'none';
+  currentUser = user || DEFAULT_USER;
   recordingSection.style.display = 'block';
   recordingSettings.style.display = 'block';
-  
-  userName.textContent = user.name || user.email || 'Пользователь';
+
+  userName.textContent = currentUser.name || currentUser.email || 'Пользователь';
   status.textContent = 'Готов к записи встреч';
   
   // Проверяем разрешение микрофона
@@ -191,7 +179,6 @@ function showRecordingInterface(user) {
 
 // Обработчики событий
 function setupEventListeners() {
-  loginBtn.addEventListener('click', handleLogin);
   requestPermissionBtn.addEventListener('click', handleRequestPermission);
   startBtn.addEventListener('click', handleStartRecording);
   stopBtn.addEventListener('click', handleStopRecording);
@@ -217,28 +204,12 @@ function setupEventListeners() {
       console.error('Popup: Upload error:', message.error);
       stopRecordingUI();
       status.textContent = 'Ошибка загрузки: ' + message.error;
-      
-      // Если ошибка авторизации - показываем вход
-      if (message.error && message.error.includes('авторизации')) {
-        showLoginInterface();
-      }
     } else if (message.type === 'recordingError') {
       console.error('Popup: Recording error:', message.error);
       stopRecordingUI();
       status.textContent = 'Ошибка записи: ' + message.error;
     }
   });
-}
-
-// Простая авторизация через веб-интерфейс
-function handleLogin() {
-  status.textContent = 'Открываем страницу входа...';
-  
-      chrome.tabs.create({
-      url: 'http://localhost:8000/login.html'
-    });
-  
-  window.close();
 }
 
 // Запрос разрешения микрофона
@@ -270,11 +241,6 @@ async function handleRequestPermission() {
 
 // Начало записи
 async function handleStartRecording() {
-  if (!currentUser) {
-    status.textContent = 'Ошибка: нет авторизации';
-    return;
-  }
-  
   if (!micPermissionGranted) {
     status.textContent = 'Ошибка: нет разрешения микрофона';
     return;

@@ -24,20 +24,6 @@ const CONFIG = {
         }
     },
 
-    // Настройки авторизации
-    AUTH: {
-        // Пароль для входа в систему
-        PASSWORD: 'your-secure-password',
-        
-        // Длительность сессии в миллисекундах (по умолчанию 24 часа)
-        SESSION_DURATION: 24 * 60 * 60 * 1000,
-        
-        STORAGE_KEYS: {
-            IS_LOGGED_IN: 'isLoggedIn',
-            LOGIN_TIME: 'loginTime'
-        }
-    },
-
     // Настройки интерфейса
     UI: {
         // Интервал обновления прогресса транскрипции (мс)

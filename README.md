@@ -20,7 +20,6 @@ https://github.com/user-attachments/assets/7e9899b9-08fc-4c5a-96f0-fffbe1ee2390
 - **Docker** + **NVIDIA Container Toolkit**
 - **NVIDIA драйверы** (470+)
 - **vLLM сервер** с моделью 32K+ токенов
-- **Google OAuth** настройки
 
 ### ⚡ Запуск за 5 минут:
 
@@ -31,7 +30,7 @@ cd whisperx-fronted-docker-compose
 
 # 2. Настраиваем переменные окружения
 cp .env.example .env
-# Редактируем .env - добавляем Google OAuth и vLLM настройки
+# Редактируем .env - добавляем настройки vLLM и S3 (при необходимости)
 
 # 3. Запускаем vLLM сервер (в отдельном терминале)
 docker run --gpus all -p 11434:8000 \
@@ -48,10 +47,6 @@ docker-compose up -d
 
 ### 🔧 Минимальная настройка .env:
 ```bash
-# Google OAuth (обязательно)
-GOOGLE_CLIENT_ID=your-google-client-id
-GOOGLE_CLIENT_SECRET=your-google-client-secret
-
 # vLLM для суммаризации (обязательно)
 SUMMARIZATION_API_URL=http://localhost:11434/v1/chat/completions
 SUMMARIZATION_MODEL=meta-llama/Llama-3.1-8B-Instruct
@@ -111,8 +106,6 @@ whisperx-fronted-docker-compose - это полнофункциональная 
 - **Автоматическая отправка** на сервер
 
 ### 🔐 Безопасность
-- **Google OAuth 2.0** аутентификация
-- **JWT токены** для авторизации
 - **CORS защита** и безопасные заголовки
 - **Шифрование данных** при передаче
 
@@ -148,10 +141,9 @@ whisperx-fronted-docker-compose/           # Корневая директори
 │   ├── main.py                           # FastAPI приложение (80 строк)
 │   ├── 
 │   ├── 🛣️ API слой
-│   ├── api/                              # REST API эндпоинты (1,185 строк)
+│   ├── api/                              # REST API эндпоинты (966 строк)
 │   │   ├── routes.py                     # Основные маршруты (589 строк)
-│   │   ├── realtime_routes.py            # Real-time WebSocket API (377 строк)
-│   │   └── auth_routes.py                # Аутентификация OAuth (219 строк)
+│   │   └── realtime_routes.py            # Real-time WebSocket API (377 строк)
 │   ├── 
 │   ├── 🧠 Ядро системы
 │   ├── core/                             # Основная логика (463 строки)
@@ -159,8 +151,7 @@ whisperx-fronted-docker-compose/           # Корневая директори
 │   │   └── transcription_processor.py    # Обработка транскрипций (361 строка)
 │   ├── 
 │   ├── 🔧 Сервисы
-│   ├── services/                         # Бизнес-логика (1,308 строк)
-│   │   ├── auth_service.py               # Google OAuth сервис (284 строки)
+│   ├── services/                         # Бизнес-логика (1,024 строки)
 │   │   ├── database_service.py           # JSON база данных (227 строк)
 │   │   ├── s3_service.py                 # Yandex Cloud S3 (149 строк)
 │   │   ├── subtitle_generator.py         # Генерация форматов (341 строка)
@@ -178,8 +169,6 @@ whisperx-fronted-docker-compose/           # Корневая директори
 │   │   └── settings.py                   # Настройки приложения (79 строк)
 │   ├── models/
 │   │   └── schemas.py                    # Pydantic схемы (91 строка)
-│   ├── middleware/
-│   │   └── auth_middleware.py            # Middleware аутентификации (54 строки)
 │   └── utils/
 │       └── time_formatters.py            # Форматировщики времени (25 строк)
 ├── 
@@ -187,8 +176,7 @@ whisperx-fronted-docker-compose/           # Корневая директори
 ├── web_interface/                        # Клиентская часть (9,247 строк)
 │   ├── 📄 HTML страницы
 │   ├── index.html                        # Главная страница (226 строк)
-│   ├── login.html                        # Страница входа (280 строк)
-│   ├── 
+│   ├──
 │   ├── 🎨 Стили
 │   ├── style.css                         # Основные стили (1,988 строк)
 │   ├── css/
@@ -204,7 +192,6 @@ whisperx-fronted-docker-compose/           # Корневая директори
 │   ├── modules/                          # Модульная архитектура (6,204 строки)
 │   │   ├── main.js                       # Главный контроллер (640 строк)
 │   │   ├── api.js                        # HTTP клиент (233 строки)
-│   │   ├── auth.js                       # Система аутентификации (173 строки)
 │   │   ├── ui.js                         # UI компоненты (337 строк)
 │   │   ├── 
 │   │   ├── 🎤 Транскрипция
@@ -309,7 +296,6 @@ graph TB
         
         subgraph JSModules["📦 JavaScript Modules"]
             MainJS[main.js<br/>Главный контроллер]
-            AuthJS[auth.js<br/>Аутентификация]
             APIJS[api.js<br/>HTTP клиент]
             TranscriptionJS[transcription.js<br/>Транскрипция]
             RealtimeJS[realtimeAudio.js<br/>Real-Time аудио]
@@ -326,7 +312,6 @@ graph TB
         
         subgraph APIRoutes["🛣️ API Routes"]
             MainRoutes[routes.py<br/>Основные эндпоинты]
-            AuthRoutes[auth_routes.py<br/>OAuth аутентификация]
             RealtimeRoutes[realtime_routes.py<br/>WebSocket API]
         end
         
@@ -336,7 +321,6 @@ graph TB
         end
         
         subgraph Services["🔧 Services Layer"]
-            AuthService[auth_service.py<br/>Google OAuth]
             S3Service[s3_service.py<br/>Yandex Cloud S3]
             DBService[database_service.py<br/>JSON база данных]
             SubtitleGen[subtitle_generator.py<br/>Генерация форматов]
@@ -355,12 +339,10 @@ graph TB
     %% External Services
     subgraph External["☁️ External Services"]
         YandexS3[Yandex Cloud S3<br/>Хранение файлов]
-        GoogleOAuth[Google OAuth 2.0<br/>Аутентификация]
         WhisperX[🎤 WhisperX Models<br/>AI транскрипция]
     end
     
     S3Service --> YandexS3
-    AuthService --> GoogleOAuth
     WhisperMgr --> WhisperX
     
     %% Data Storage
@@ -402,9 +384,9 @@ graph TB
     classDef dockerClass fill:#e3f2fd,stroke:#0d47a1,stroke-width:2px
     
     class User,Browser,Extension userClass
-    class WebUI,StaticServer,JSModules,MainJS,AuthJS,APIJS,TranscriptionJS,RealtimeJS,SummarizationJS frontendClass
-    class FastAPI,APIRoutes,MainRoutes,AuthRoutes,RealtimeRoutes,Core,WhisperMgr,TransProcessor,Services,AuthService,S3Service,DBService,SubtitleGen,Realtime,RTManager,RTProcessor,WSHandler backendClass
-    class YandexS3,GoogleOAuth,WhisperX,Formats,JSON,SRT,VTT,TSV,DOCX,PDF externalClass
+    class WebUI,StaticServer,JSModules,MainJS,APIJS,TranscriptionJS,RealtimeJS,SummarizationJS frontendClass
+    class FastAPI,APIRoutes,MainRoutes,RealtimeRoutes,Core,WhisperMgr,TransProcessor,Services,S3Service,DBService,SubtitleGen,Realtime,RTManager,RTProcessor,WSHandler backendClass
+    class YandexS3,WhisperX,Formats,JSON,SRT,VTT,TSV,DOCX,PDF externalClass
     class JSONDb,TempFiles,Uploads storageClass
     class BackendContainer,FrontendContainer,GPUSupport dockerClass
 ```
@@ -416,7 +398,6 @@ graph TB
 - **WhisperX** - AI модель транскрипции
 - **Pydantic** - валидация данных
 - **Uvicorn** - ASGI сервер
-- **Google Auth** - OAuth 2.0 аутентификация
 - **boto3** - AWS/Yandex Cloud SDK
 - **WebSockets** - real-time коммуникация
 - **python-docx & reportlab** - генерация документов
@@ -437,7 +418,6 @@ graph TB
 
 ### ☁️ Облачные сервисы
 - **Yandex Cloud S3** - хранение файлов
-- **Google OAuth 2.0** - аутентификация
 - **JSON Database** - метаданные
 
 ### 🐳 DevOps
@@ -472,9 +452,6 @@ cp web_interface/config.example.js web_interface/config.js
 export S3_ACCESS_KEY="your_s3_key"
 export S3_SECRET_KEY="your_s3_secret"
 export S3_BUCKET="your_bucket"
-export GOOGLE_CLIENT_ID="your_google_client_id"
-export GOOGLE_CLIENT_SECRET="your_google_client_secret"
-export JWT_SECRET_KEY="your_jwt_secret"
 ```
 
 ### 🏃‍♂️ Запуск приложения
@@ -561,14 +538,6 @@ SUMMARIZATION_API_KEY=your-api-key-here
 SUMMARIZATION_MODEL=meta-llama/Llama-3.1-8B-Instruct
 ```
 
-### 🔐 Система аутентификации
-**Файлы:** `src/services/auth_service.py`, `src/api/auth_routes.py`
-
-- Google OAuth 2.0 интеграция
-- JWT токены для авторизации
-- Middleware для защиты маршрутов
-- Управление сессиями
-
 ### ☁️ Облачное хранение
 **Файлы:** `src/services/s3_service.py`
 
@@ -598,12 +567,6 @@ SUMMARIZATION_MODEL=meta-llama/Llama-3.1-8B-Instruct
 
 ## 🔧 API Endpoints
 
-### 🔐 Аутентификация
-- `GET /api/auth/oauth/google` - Инициация OAuth
-- `GET /api/auth/oauth/google/callback` - OAuth callback
-- `POST /api/auth/refresh` - Обновление токена
-- `GET /api/auth/user` - Информация о пользователе
-
 ### 🎤 Транскрипция
 - `POST /api/upload` - Загрузка файла
 - `GET /api/status/{task_id}` - Статус обработки
@@ -622,12 +585,6 @@ SUMMARIZATION_MODEL=meta-llama/Llama-3.1-8B-Instruct
 - `DELETE /api/realtime/session/{session_id}` - Завершение сессии
 
 ## 🛡️ Безопасность
-
-### 🔐 Аутентификация и авторизация
-- Google OAuth 2.0 для безопасного входа
-- JWT токены с истечением срока действия
-- Refresh токены для продления сессий
-- Middleware для защиты маршрутов
 
 ### 🌐 Веб-безопасность
 - CORS настройки для разрешенных доменов

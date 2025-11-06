@@ -9,19 +9,17 @@ import tempfile
 import shutil
 import os
 
-from fastapi import APIRouter, File, UploadFile, HTTPException, BackgroundTasks, Query, Depends
-from fastapi.responses import JSONResponse, FileResponse, RedirectResponse, StreamingResponse
+from fastapi import APIRouter, File, UploadFile, HTTPException, BackgroundTasks, Query
+from fastapi.responses import JSONResponse, FileResponse, RedirectResponse
 
 from ..models.schemas import (
-    TranscriptionStatus, 
-    TranscriptionResult, 
+    TranscriptionStatus,
+    TranscriptionResult,
     TranscriptionListItem,
-    TranscriptionConfig,
-    User
+    TranscriptionConfig
 )
 from ..core.transcription_processor import TranscriptionProcessor
 from ..config.settings import UPLOADS_DIR, SUPPORTED_FORMATS, SUMMARIZATION_CONFIG
-from ..middleware.auth_middleware import get_current_user, get_current_user_optional  # Включено обратно
 from ..services.summarization_service import SummarizationService
 import logging
 
@@ -46,8 +44,7 @@ async def upload_file(
     diarize: bool = False,
     hf_token: Optional[str] = None,
     compute_type: str = "float16",
-    batch_size: int = 16,
-    current_user: User = Depends(get_current_user)
+    batch_size: int = 16
 ):
     """
     Загрузка файла для транскрипции
@@ -110,14 +107,13 @@ async def upload_file(
     # Инициализируем статус задачи
     processor.update_task_status(task_id, "pending", "Задача добавлена в очередь")
     
-    # Запускаем обработку в фоне с привязкой к пользователю
+    # Запускаем обработку в фоне
     background_tasks.add_task(
-        processor.process_transcription, 
-        task_id, 
-        file_path, 
+        processor.process_transcription,
+        task_id,
+        file_path,
         config,
-        file.filename,
-        current_user.id  # Передаем ID пользователя
+        file.filename
     )
     
     return TranscriptionStatus(
@@ -131,8 +127,7 @@ async def upload_file(
 
 @router.get("/status/{task_id}", response_model=TranscriptionResult)
 async def get_transcription_status(
-    task_id: str,
-    current_user: User = Depends(get_current_user)
+    task_id: str
 ):
     """Получение статуса и результата транскрипции по ID"""
     
@@ -141,10 +136,6 @@ async def get_transcription_status(
     
     # Проверяем в базе данных
     db_record = processor.db_service.get_transcription(task_id)
-    
-    # Проверяем права доступа к транскрипции
-    if db_record and db_record.get('user_id') != current_user.id:
-        raise HTTPException(status_code=403, detail="Нет доступа к этой транскрипции")
     
     if db_record:
         # Результат готов, загружаем полные данные с S3 если нужны сегменты
@@ -212,11 +203,9 @@ async def get_transcription_status(
 
 
 @router.get("/transcriptions", response_model=List[TranscriptionListItem])
-async def get_all_transcriptions(
-    current_user: User = Depends(get_current_user)
-):
-    """Получение транскрипций пользователя из JSON базы данных"""
-    transcriptions = processor.db_service.get_user_transcriptions(current_user.id)
+async def get_all_transcriptions():
+    """Получение всех транскрипций из JSON базы данных"""
+    transcriptions = processor.db_service.get_all_transcriptions()
     
     results = []
     for data in transcriptions:
@@ -328,15 +317,13 @@ async def health_check():
 
 @router.post("/summarize/{task_id}")
 async def create_summarization(
-    task_id: str,
-    current_user: User = Depends(get_current_user)
+    task_id: str
 ):
     """
     Создание суммаризации транскрипции
     
     Args:
         task_id: ID задачи транскрипции
-        current_user: Текущий пользователь
         
     Returns:
         dict: Результат суммаризации
@@ -347,10 +334,6 @@ async def create_summarization(
         
         if not db_record:
             raise HTTPException(status_code=404, detail="Транскрипция не найдена")
-        
-        # Проверяем права доступа
-        if db_record.get('user_id') != current_user.id:
-            raise HTTPException(status_code=403, detail="Нет доступа к этой транскрипции")
         
         if db_record['status'] != 'completed':
             raise HTTPException(status_code=400, detail="Транскрипция еще не завершена")
@@ -387,9 +370,7 @@ async def create_summarization(
 
 
 @router.get("/config/summarization")
-async def get_summarization_config(
-    current_user: User = Depends(get_current_user)
-):
+async def get_summarization_config():
     """
     Получение конфигурации суммаризации
     
