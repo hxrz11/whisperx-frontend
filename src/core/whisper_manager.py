@@ -9,6 +9,7 @@ from typing import Optional, Callable
 import whisperx
 
 from ..models.schemas import TranscriptionConfig
+from ..utils import DependencyValidationError, validate_whisperx_dependencies
 
 
 class WhisperManager:
@@ -51,6 +52,15 @@ class WhisperManager:
         with self.loading_lock:
             if self.models_loaded:
                 return
+
+            try:
+                validate_whisperx_dependencies()
+            except DependencyValidationError as dep_error:
+                error_message = str(dep_error)
+                print(f"❌ Ошибка проверки зависимостей WhisperX: {error_message}")
+                if status_callback:
+                    status_callback("dependency_error", error_message, 0)
+                raise RuntimeError(error_message) from dep_error
             
             # Определяем compute_type
             compute_type = config.compute_type
