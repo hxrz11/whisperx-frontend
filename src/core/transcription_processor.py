@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Dict, Any
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
+import traceback
 
 from ..models.schemas import TranscriptionConfig
 from ..services.subtitle_generator import SubtitleGenerator
@@ -125,6 +126,7 @@ class TranscriptionProcessor:
         except Exception as e:
             error_msg = f"Ошибка обработки: {str(e)}"
             print(f"❌ {error_msg}")
+            print(traceback.format_exc())
             self.save_error_result(task_id, error_msg, original_filename)
             self.update_task_status(task_id, "failed", error=error_msg, progress_percent=0)
     
