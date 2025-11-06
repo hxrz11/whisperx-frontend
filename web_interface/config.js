@@ -18,16 +18,6 @@ const CONFIG = {
         }
     },
 
-    // Настройки авторизации
-    AUTH: {
-        PASSWORD: 'AI-Transcribe',
-        SESSION_DURATION: 24 * 60 * 60 * 1000, // 24 часа в миллисекундах
-        STORAGE_KEYS: {
-            IS_LOGGED_IN: 'isLoggedIn',
-            LOGIN_TIME: 'loginTime'
-        }
-    },
-
     // Настройки интерфейса
     UI: {
         PROGRESS_UPDATE_INTERVAL: 2000, // Интервал обновления прогресса в мс
@@ -106,7 +96,6 @@ const CONFIG = {
         },
         SUCCESS: {
             TRANSCRIPTION_DELETED: 'Транскрипция успешно удалена',
-            LOGIN_SUCCESS: 'Вход выполнен успешно! Перенаправление...',
             FILE_DOWNLOADED: 'Готово'
         },
         INFO: {

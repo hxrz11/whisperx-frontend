@@ -22,7 +22,6 @@ class ApiManager {
         
         const response = await fetch(`${this.baseUrl}${this.config.ENDPOINTS.UPLOAD}?${params}`, {
             method: 'POST',
-            credentials: 'include',
             body: formData
         });
         
@@ -35,9 +34,7 @@ class ApiManager {
 
     // Получение статуса транскрипции
     async getStatus(taskId) {
-        const response = await fetch(`${this.baseUrl}${this.config.ENDPOINTS.STATUS}/${taskId}`, {
-            credentials: 'include'
-        });
+        const response = await fetch(`${this.baseUrl}${this.config.ENDPOINTS.STATUS}/${taskId}`);
         
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
@@ -55,9 +52,7 @@ class ApiManager {
         }
         
         try {
-            const response = await fetch(url, {
-                credentials: 'include'
-            });
+            const response = await fetch(url);
             
             if (!response.ok) {
                 const errorText = await response.text();
@@ -88,9 +83,7 @@ class ApiManager {
         }
         
         try {
-            const response = await fetch(url, {
-                credentials: 'include'
-            });
+            const response = await fetch(url);
             
             if (!response.ok) {
                 const errorText = await response.text();
@@ -143,9 +136,7 @@ class ApiManager {
             console.log(`API: Making request to: ${url}`);
         }
         
-        const response = await fetch(url, {
-            credentials: 'include'
-        });
+        const response = await fetch(url);
         
         if (!response.ok) {
             const errorText = await response.text();
@@ -158,9 +149,7 @@ class ApiManager {
 
     // Скачивание аудио файла
     async downloadAudio(taskId) {
-        const response = await fetch(`${this.baseUrl}${this.config.ENDPOINTS.DOWNLOAD_AUDIO}/${taskId}`, {
-            credentials: 'include'
-        });
+        const response = await fetch(`${this.baseUrl}${this.config.ENDPOINTS.DOWNLOAD_AUDIO}/${taskId}`);
         
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
@@ -172,8 +161,7 @@ class ApiManager {
     // Удаление транскрипции
     async deleteTranscription(taskId) {
         const response = await fetch(`${this.baseUrl}${this.config.ENDPOINTS.DELETE_TRANSCRIPTION}/${taskId}`, {
-            method: 'DELETE',
-            credentials: 'include'
+            method: 'DELETE'
         });
         
         if (!response.ok) {
@@ -186,8 +174,7 @@ class ApiManager {
     // Отмена транскрипции
     async cancelTranscription(taskId) {
         const response = await fetch(`${this.baseUrl}${this.config.ENDPOINTS.STATUS}/${taskId}`, {
-            method: 'DELETE',
-            credentials: 'include'
+            method: 'DELETE'
         });
         
         if (!response.ok) {
@@ -233,7 +220,6 @@ class ApiManager {
         const url = `${this.baseUrl}${endpoint}`;
         
         const defaultOptions = {
-            credentials: 'include',
             headers: {
                 'Content-Type': 'application/json'
             }

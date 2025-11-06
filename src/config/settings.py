@@ -25,22 +25,6 @@ S3_CONFIG = {
     'region_name': os.getenv('S3_REGION', 'ru-central1')
 }
 
-# OAuth конфигурация
-OAUTH_CONFIG = {
-    'google_client_id': os.getenv('GOOGLE_CLIENT_ID', ''),
-    'google_client_secret': os.getenv('GOOGLE_CLIENT_SECRET', ''),
-    'redirect_uri': os.getenv('REDIRECT_URI', 'http://localhost:8880/api/auth/oauth/google/callback'),
-    'scopes': ['https://www.googleapis.com/auth/userinfo.email', 'https://www.googleapis.com/auth/userinfo.profile']
-}
-
-# JWT конфигурация
-JWT_CONFIG = {
-    'secret_key': os.getenv('JWT_SECRET_KEY', ''),
-    'algorithm': 'HS256',
-    'access_token_expire_minutes': 60 * 24 * 7,  # 7 дней
-    'refresh_token_expire_minutes': 60 * 24 * 30  # 30 дней
-}
-
 # Поддерживаемые форматы
 SUPPORTED_FORMATS = {
     # Аудио

@@ -16,7 +16,7 @@ PORT = 8000
 DIRECTORY = Path(__file__).parent
 
 class CORSHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
-    """HTTP обработчик с поддержкой CORS и перенаправлением"""
+    """HTTP обработчик с поддержкой CORS"""
     
     def end_headers(self):
         self.send_header('Access-Control-Allow-Origin', '*')
@@ -29,14 +29,7 @@ class CORSHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
     
     def do_GET(self):
-        # Перенаправляем корневой путь на страницу логина
-        if self.path == '/':
-            self.send_response(302)
-            self.send_header('Location', '/login.html')
-            self.end_headers()
-            return
-        
-        # Обычная обработка для остальных путей
+        # Обычная обработка для всех путей
         super().do_GET()
 
 def main():
@@ -50,7 +43,6 @@ def main():
         print(f"📁 Директория: {DIRECTORY}")
         print(f"🌐 Локальный доступ: http://localhost:{PORT}")
         print(f"🌐 Сетевой доступ: http://0.0.0.0:{PORT}")
-        print(f"🔐 Пароль для входа: AI-Transcribe")
         print("⏹️  Для остановки нажмите Ctrl+C")
         
         # Автоматически открыть браузер

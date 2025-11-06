@@ -423,7 +423,7 @@ async function uploadRecording() {
       
       let errorMessage;
       if (response.status === 401) {
-        errorMessage = 'Ошибка авторизации. Войдите заново.';
+        errorMessage = 'Ошибка отправки данных. Попробуйте снова.';
       } else {
         errorMessage = `HTTP ${response.status}: ${errorText}`;
       }
