@@ -56,12 +56,13 @@ COPY . .
 # Устанавливаем uv для быстрой установки зависимостей
 RUN python -m pip install --upgrade pip && pip install uv
 
-# Устанавливаем Python зависимости из pyproject.toml
-# Принудительно переустанавливаем PyTorch с правильной версией
+# Устанавливаем CUDA-версии PyTorch, Torchaudio и Torchvision
+# Используем официальный индекс PyTorch для гарантированной совместимости
 RUN uv pip install --system --no-cache \
-    "torch>=2.6.0" \
-    "torchaudio>=2.6.0" \
-    "torchvision>=0.21.0"
+    --index-url https://download.pytorch.org/whl/cu124 \
+    torch==2.6.0+cu124 \
+    torchaudio==2.6.0+cu124 \
+    torchvision==0.21.0+cu124
 
 # Устанавливаем остальные зависимости из requirements.txt
 RUN uv pip install --system --no-cache -r requirements.txt
