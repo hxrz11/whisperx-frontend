@@ -15,6 +15,7 @@ starlette==0.27.0
 whisperx
 torch
 torchaudio
+torchvision
 transformers
 accelerate
 ctranslate2

@@ -17,6 +17,7 @@ _REQUIRED_MODULES: Dict[str, str] = {
     "faster_whisper": "Установите faster-whisper: pip install faster-whisper",
     "pyannote.audio": "Установите pyannote.audio: pip install pyannote.audio",
     "pytorch_lightning": "Установите pytorch-lightning: pip install pytorch-lightning",
+    "torchvision": "Установите torchvision: pip install torchvision",
 }
 
 _OPTIONAL_HINTS: Dict[str, str] = {
@@ -52,6 +53,27 @@ def validate_whisperx_dependencies() -> None:
             "⚠️ Обнаружены отсутствующие дополнительные зависимости:\n" + "\n".join(hints)
         )
 
+    # torchvision тесно связан с torch и часто вызывает ошибки совместимости при импорте.
+    # Пробуем явно импортировать его, чтобы сообщить пользователю более понятную ошибку.
+    try:
+        importlib.import_module("torchvision")
+    except ModuleNotFoundError as exc:
+        raise DependencyValidationError(
+            "Не найден пакет 'torchvision'. Установите его: pip install torchvision"
+        ) from exc
+    except RuntimeError as exc:
+        raise DependencyValidationError(
+            "Ошибка инициализации 'torchvision'. Убедитесь, что версии PyTorch и torchvision"
+            " совместимы и что установлены необходимые операторные расширения"
+            " (например, torchvision::nms). Исходная ошибка: "
+            f"{exc}"
+        ) from exc
+    except Exception as exc:
+        raise DependencyValidationError(
+            "Не удалось инициализировать 'torchvision'. Проверьте установку и совместимость"
+            f" зависимостей. Исходная ошибка: {exc}"
+        ) from exc
+
     # Проверяем, что transformers корректно инициализируется и доступен класс Pipeline.
     try:
         transformers_module = importlib.import_module("transformers")
@@ -68,7 +90,7 @@ def validate_whisperx_dependencies() -> None:
     except Exception as exc:
         raise DependencyValidationError(
             "Ошибка инициализации transformers.Pipeline. Проверьте совместимость пакетов 'transformers',"
-            " 'scikit-learn' и других зависимостей. Исходная ошибка: "
+            " 'torch', 'torchvision', 'scikit-learn' и других зависимостей. Исходная ошибка: "
             f"{exc}"
         ) from exc
 
